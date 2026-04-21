@@ -1,6 +1,6 @@
 # Local DB (`DbTargetAdapter`)
 
-`DbTargetAdapter` is the default target adapter. It is resolved automatically when `target.service` is unset or set to `'db'` — the factory short-circuits service-based dispatch for the local-DB case because it is by far the most common target. No `target.adapter` or `target.kind` is required.
+`DbTargetAdapter` is the default target adapter, selected automatically when `target.service` is unset or set to `'db'`. No `target.adapter` or `target.kind` is required.
 
 Writes go through CAP's `cds.connect.to('db')`:
 
@@ -22,7 +22,7 @@ await pipelines.addPipeline({
 });
 ```
 
-The factory resolves `DbTargetAdapter` because `target.service` is unset. Setting `target.service: 'db'` explicitly resolves the same adapter.
+`DbTargetAdapter` is used because `target.service` is unset. Setting `target.service: 'db'` explicitly selects the same adapter.
 
 ## Capabilities
 
@@ -35,15 +35,15 @@ The factory resolves `DbTargetAdapter` because `target.service` is unset. Settin
 }
 ```
 
-All four capabilities are advertised, so every combination of `mode` (`delta`, `full`, `partial-refresh`) and read shape (entity-shape, query-shape) registers cleanly. The [Inference rules registration matrix](../concepts/inference.md#registration-validation-matrix) only rejects configs for adapters missing a required capability — never for `DbTargetAdapter`.
+All four capabilities are supported, so every combination of `mode` (`delta`, `full`, `partial-refresh`) and read shape (entity-shape, query-shape) registers cleanly.
 
 ## Transactional semantics
 
-Entity-shape (UPSERT, `mode: 'delta'` or `'full'`) writes are **not** wrapped in an outer transaction by the engine. Each batch commits on its own so partial progress survives interruptions.
+Entity-shape (UPSERT, `mode: 'delta'` or `'full'`) writes are **not** wrapped in an outer transaction. Each batch commits on its own so partial progress survives interruptions.
 
 Query-shape (snapshot) writes **are** wrapped in an outer `cds.tx` that spans `truncate` + all `INSERT` batches. A mid-run crash rolls back and leaves the previous snapshot intact.
 
-See [Targets → overview → Transactional semantics](index.md#transactional-semantics) for the engine-level behaviour both adapters inherit.
+See [Targets → overview → Transactional semantics](index.md#transactional-semantics) for the behaviour both adapters inherit.
 
 ## Target shape
 
@@ -64,7 +64,7 @@ For materialize pipelines the target is a plain `@cds.persistence.table` whose c
 
 ## See also
 
-- [Targets → overview](index.md) — factory resolution and the capability-gating matrix.
+- [Targets → overview](index.md) — resolution order and the capability-gating matrix.
 - [Targets → OData](odata.md) — the built-in non-DB alternative.
 - [Concepts → Consumption views](../concepts/consumption-views.md) — the idiomatic replicate-target pattern.
 - [Recipes → Built-in replicate](../recipes/built-in-replicate.md) — worked example with a DB target.

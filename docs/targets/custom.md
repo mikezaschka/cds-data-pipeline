@@ -1,8 +1,8 @@
 # Custom target adapter
 
-When the destination is not the local DB (`'db'`) and not an OData service (`'odata'` / `'odata-v2'`), the factory in `srv/adapters/targets/factory.js` will refuse to register the pipeline unless you supply a `target.adapter` class reference. Write one by extending `BaseTargetAdapter`.
+When the destination is not the local DB (`'db'`) and not an OData service (`'odata'` / `'odata-v2'`), `addPipeline` rejects the config unless you supply a `target.adapter` class reference. Write one by extending `BaseTargetAdapter`.
 
-The engine calls four methods on the adapter — three write primitives plus the capability-advertisement hook it consults at registration.
+Four methods are called on the adapter — three write primitives plus the capability hook consulted at registration.
 
 ## Contract
 
@@ -12,13 +12,13 @@ const BaseTargetAdapter = require('cds-data-pipeline/srv/adapters/targets/BaseTa
 class MyTargetAdapter extends BaseTargetAdapter {
     async writeBatch(records, { mode, target }) {
         // mode: 'upsert' (entity-shape) | 'snapshot' (query-shape INSERT
-        // after engine-driven clear). target: { service?, entity }.
+        // after the target is cleared). target: { service?, entity }.
         // Return { created, updated, deleted } for the tracker.
     }
 
     async truncate(target) {
-        // Full-refresh clear. Called from _fullSync and from
-        // _prepareMaterializeTarget when refresh === 'full'.
+        // Full-refresh clear, called before the first snapshot batch or
+        // at the start of a mode: 'full' run.
     }
 
     async deleteSlice(target, predicate) {
@@ -39,7 +39,7 @@ class MyTargetAdapter extends BaseTargetAdapter {
 
 ## Capability gating
 
-Registration (`DataPipelineService._validateTargetCapabilities`) rejects incompatible configs by consulting `capabilities()`:
+`addPipeline` rejects incompatible configs by consulting `capabilities()`:
 
 | Config | Required capability |
 |---|---|
@@ -47,15 +47,15 @@ Registration (`DataPipelineService._validateTargetCapabilities`) rejects incompa
 | `mode: 'full'` | `truncate` **or** `batchDelete` |
 | `source.query` (query-shape) | `batchInsert` |
 
-Omitted keys default to `false`. Advertise only what your adapter actually supports — the engine will reject users at `addPipeline(...)` rather than halfway through the first run.
+Omitted keys default to `false`. Report only what your adapter actually supports — `addPipeline` rejects users at registration rather than halfway through the first run.
 
-## Factory resolution order
+## Resolution order
 
-1. `config.target.adapter` — class reference extending `BaseTargetAdapter`. Full control; skips the service-based dispatch.
+1. `config.target.adapter` — class reference extending `BaseTargetAdapter`. Takes precedence over `target.service`.
 2. `config.target.service` unset or `'db'` → built-in `DbTargetAdapter`.
-3. `config.target.kind` (`'odata' | 'odata-v2'`) — explicit transport selector. Wins over the connected service's auto-detected kind.
+3. `config.target.kind` (`'odata' | 'odata-v2'`) — explicit transport selector. Takes precedence over the connected service's auto-detected kind.
 4. Auto-detected `service.options.kind` (`'odata' | 'odata-v2'`) on the connected remote service → built-in `ODataTargetAdapter`.
-5. Any other `config.target.service` with no `target.adapter` → **registration error** pointing to this page. The factory does not silently fall back to the local DB.
+5. Any other `config.target.service` with no `target.adapter` → **registration error** pointing to this page.
 
 ## Worked example — a reporting-service target adapter
 
@@ -66,19 +66,19 @@ const cds = require('@sap/cds');
 const BaseTargetAdapter = require('cds-data-pipeline/srv/adapters/targets/BaseTargetAdapter');
 
 class ReportingTargetAdapter extends BaseTargetAdapter {
-    async _reporting() {
-        if (!this._svc) {
+    async getReporting() {
+        if (!this.reporting) {
             const targetService = this.config.target && this.config.target.service;
-            this._svc = this.service || await cds.connect.to(targetService);
+            this.reporting = this.service || await cds.connect.to(targetService);
         }
-        return this._svc;
+        return this.reporting;
     }
 
     async writeBatch(records, { mode }) {
         if (!records || records.length === 0) {
             return { created: 0, updated: 0, deleted: 0 };
         }
-        const svc = await this._reporting();
+        const svc = await this.getReporting();
 
         if (mode === 'snapshot') {
             throw new Error(
@@ -92,7 +92,7 @@ class ReportingTargetAdapter extends BaseTargetAdapter {
     }
 
     async truncate() {
-        const svc = await this._reporting();
+        const svc = await this.getReporting();
         await svc.send({ event: 'truncate', data: {} });
     }
 
@@ -145,15 +145,15 @@ await pipelines.addPipeline({
 
 ## Transactional semantics
 
-The engine wraps the WRITE loop in a `cds.tx` transaction only for query-shape (snapshot) pipelines — so `truncate` / `deleteSlice` + batch `INSERT`s commit atomically and a mid-run crash leaves the previous snapshot intact. Entity-shape (UPSERT) pipelines run without an outer transaction: each batch commits on its own so partial progress survives interruptions.
+Query-shape (snapshot) pipelines run inside a `cds.tx` transaction — so `truncate` / `deleteSlice` + batch `INSERT`s commit atomically and a mid-run crash leaves the previous snapshot intact. Entity-shape (UPSERT) pipelines run without an outer transaction: each batch commits on its own so partial progress survives interruptions.
 
-Target adapters do not have to manage `cds.tx` themselves; they inherit the ambient `cds.context` / transaction from the engine. Custom remote-protocol adapters (like the reporting-service adapter above) need to surface their own atomicity guarantees at the service boundary — the engine's `cds.tx` does not span remote HTTP calls.
+Target adapters do not have to manage `cds.tx` themselves; they inherit the ambient `cds.context` / transaction. Custom remote-protocol adapters (like the reporting-service adapter above) need to surface their own atomicity guarantees at the service boundary — `cds.tx` does not span remote HTTP calls.
 
 ## See also
 
-- [Targets → overview](index.md) — factory resolution and the capability-gating matrix.
+- [Targets → overview](index.md) — resolution order and the capability-gating matrix.
 - [Targets → Local DB](db.md) and [OData](odata.md) — the two built-in target adapters.
 - [Sources → Custom source adapter](../sources/custom.md) — the peer contract for the READ phase.
 - [Recipes → Custom target adapter](../recipes/custom-target-adapter.md) — scenario-driven walkthrough.
-- [Recipes → Write-hook override](../recipes/write-hook-override.md) — the lightweight alternative for one-off forwarding.
-- [Concepts → Inference rules](../concepts/inference.md) — target dispatch and the full capability-gated validation matrix.
+- [Recipes → Event hooks](../recipes/event-hooks.md) — the lightweight alternative for one-off forwarding and per-phase customization.
+- [Concepts → Inference rules](../concepts/inference.md) — target adapter selection and the full validation matrix.

@@ -1,8 +1,8 @@
 # OData (`ODataTargetAdapter`)
 
-`ODataTargetAdapter` forwards writes to a remote OData V2 / V4 service through CAP's connected remote service. It is resolved automatically when `target.kind` is `'odata'` / `'odata-v2'` or when the connected remote service advertises that kind via `service.options.kind`. No custom code is required — point `target.service` at a CAP service registered with `kind: 'odata'` (or `'odata-v2'`) and the factory wires everything up.
+`ODataTargetAdapter` forwards writes to a remote OData V2 / V4 service through CAP's connected remote service. It is selected automatically when `target.kind` is `'odata'` / `'odata-v2'` or when the connected remote service advertises that kind via `service.options.kind`. No custom code is required — point `target.service` at a CAP service registered with `kind: 'odata'` (or `'odata-v2'`) and the adapter takes over.
 
-Writes dispatch through CQN — `writeBatch` issues `UPSERT.into(entity).entries(records)` (or `INSERT` in snapshot mode) and CAP's remote runtime translates to POST / PUT / PATCH / DELETE (with `$batch` change sets where supported). `truncate` and `deleteSlice` page the remote for keys, then issue one DELETE per row — OData has no bulk DELETE, so large full-refresh sweeps are `O(n)` round-trips.
+Writes dispatch through CQN — `writeBatch` issues `UPSERT.into(entity).entries(records)` (or `INSERT` in snapshot mode) and CAP's remote runtime translates to POST / PUT / PATCH / DELETE (with `$batch` change sets where supported). OData has no bulk DELETE, so `truncate` and `deleteSlice` are `O(n)` round-trips on large targets — prefer `mode: 'delta'` for high-volume pipelines.
 
 ## Registration
 
@@ -34,7 +34,7 @@ await pipelines.addPipeline({
 }
 ```
 
-All four capabilities are advertised, so `mode: 'delta'`, `mode: 'full'`, and `source.query` snapshots all register cleanly. Note that `batchDelete` and `truncate` dispatch per-row DELETEs under the hood — see [Known limitations](#known-limitations).
+All four capabilities are supported, so `mode: 'delta'`, `mode: 'full'`, and `source.query` snapshots all register cleanly. See [Known limitations](#known-limitations) for caveats on large-target full refreshes.
 
 ## Tuning knobs
 
@@ -59,7 +59,7 @@ See [Recipes → Built-in replicate → To a remote OData target](../recipes/bui
 
 ## See also
 
-- [Targets → overview](index.md) — factory resolution and the capability-gating matrix.
+- [Targets → overview](index.md) — resolution order and the capability-gating matrix.
 - [Targets → Custom target adapter](custom.md) — for non-OData remote targets.
 - [Sources → OData V2 / V4](../sources/odata.md) — OData on the READ side.
-- [Concepts → Inference rules](../concepts/inference.md) — target dispatch and registration validation.
+- [Concepts → Inference rules](../concepts/inference.md) — target adapter selection and registration validation.

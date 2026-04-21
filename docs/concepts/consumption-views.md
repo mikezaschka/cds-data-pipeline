@@ -55,7 +55,7 @@ await pipelines.addPipeline({
 - A remote entity whose fields already match the target table exactly, or
 - A custom `PIPELINE.MAP` hook that does the translation imperatively.
 
-Consumption views give you the third, declarative option — **say what the local shape should be, once, in CDS**, and let the engine plumb records through accordingly.
+Consumption views give you the third, declarative option — **say what the local shape should be, once, in CDS**, and let the plugin map records into that shape.
 
 ## Where consumption views fit the plugin entry points
 
@@ -63,7 +63,7 @@ Consumption views give you the third, declarative option — **say what the loca
 |---|---|
 | [Built-in replicate → local DB target](../recipes/built-in-replicate.md) | The common case. The view is the target table; the pipeline pulls the remote entity into it on a schedule. |
 | [Built-in materialize](../recipes/built-in-materialize.md) | The target is typically a plain `@cds.persistence.table` because the shape is driven by a SELECT CQN closure (`source.query`), not by a projection. A consumption view can still define the schema if you prefer — the `source.query` supplies the values. |
-| [Built-in replicate → remote OData target](../recipes/built-in-replicate.md#to-a-remote-odata-target) / [Custom target adapter](../recipes/custom-target-adapter.md) / [Write-hook override](../recipes/write-hook-override.md) | The target lives on a non-db service, so there is no local table to model. Consumption views do not apply directly. |
+| [Built-in replicate → remote OData target](../recipes/built-in-replicate.md#to-a-remote-odata-target) / [Custom target adapter](../recipes/custom-target-adapter.md) / [Event hooks](../recipes/event-hooks.md) | The target lives on a non-db service, so there is no local table to model. Consumption views do not apply directly. |
 
 ## See also
 

@@ -1,11 +1,11 @@
 # OData V2 / V4
 
-The OData adapter reads entity-shape sources over OData V4, OData V2, or HCQL. It is selected automatically by the adapter factory based on the connected service's `kind`, or explicitly via `source.kind` on the pipeline config.
+The OData adapter reads entity-shape sources over OData V4, OData V2, or HCQL. It is selected automatically from the connected service's `kind`, or explicitly via `source.kind` on the pipeline config.
 
 | Source `cds.requires.<service>.kind` | Adapter | Notes |
 |---|---|---|
 | `odata` (OData V4) | `ODataAdapter` | CAP-native CQN translation. Default. All three delta modes supported. |
-| `odata-v2` | `ODataAdapter` | CAP-native; V2 returns decimals and `$count` as strings, the adapter handles conversion. Provider apps exposing V2 typically use `@cap-js-community/odata-v2-adapter`. |
+| `odata-v2` | `ODataAdapter` | CAP-native; V2 returns decimals and `$count` as strings, which CAP converts. Provider apps exposing V2 typically use `@cap-js-community/odata-v2-adapter`. |
 | `hcql` | `ODataAdapter` | SAP's Cloud Query Language protocol (e.g., xtravels sample). No gaps versus OData V4 for pipeline purposes. |
 | `rest` | `RestAdapter` | Different adapter. See [REST adapter](rest.md). |
 
@@ -45,7 +45,7 @@ module.exports = async () => {
 };
 ```
 
-The adapter issues `SELECT` against the remote service through the CAP runtime; column restriction and `where` clauses flow through the standard CQN → OData translator.
+Column restriction and `where` clauses flow through the standard CAP CQN-to-OData translation.
 
 ## Shape the target with a consumption view
 
@@ -98,7 +98,7 @@ All three are implemented for both OData V4 and V2.
 
 ## Server-driven paging
 
-Some OData services cap the number of rows returned per request regardless of `$top` — Northwind, for example, returns at most 20 rows per page and signals the next page via `@odata.nextLink`. The adapter pages by `$top` / `$skip` (using `source.batchSize`, default `1000`) and keeps paging until the remote returns an empty batch, so a smaller server-enforced cap never causes silent truncation.
+Some OData services cap the number of rows returned per request regardless of `$top` — Northwind, for example, returns at most 20 rows per page and signals the next page via `@odata.nextLink`. The adapter pages by `$top` / `$skip` (using `source.batchSize`, default `1000`) and keeps paging until the remote returns an empty batch, so a smaller server-enforced cap is handled transparently.
 
 ## CQL / CQN features supported on remote services
 
@@ -125,8 +125,8 @@ These are CAP-platform limitations surfaced through the OData adapter:
 | Feature | V2 behavior |
 |---|---|
 | Nested `$expand` options (`$filter`, `$orderby`, `$top`, `$skip` inside an expand) | **Not supported** by the V2 protocol itself. These work on V4 only. |
-| `$count` | Returned as a string; the adapter converts to `Number`. |
-| Decimals | Returned as strings; CAP handles conversion. |
+| `$count` | Returned as a string on the wire; surfaced as `Number`. |
+| Decimals | Returned as strings on the wire; CAP handles conversion. |
 
 ## Authentication
 

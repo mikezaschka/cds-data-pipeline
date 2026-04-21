@@ -5,19 +5,19 @@ hide:
 
 # Targets
 
-The **target** side of a pipeline owns the `PIPELINE.WRITE` phase plus the pre-write clear (`truncate` / `deleteSlice`) that full-refresh and partial-refresh modes need. A target adapter advertises its `capabilities()` so the engine can reject incompatible configs at registration time rather than halfway through the first run.
+The **target** side of a pipeline owns the `PIPELINE.WRITE` phase plus the pre-write clear (`truncate` / `deleteSlice`) that full-refresh and partial-refresh modes need. A target adapter reports its `capabilities()` so `addPipeline` can reject incompatible configs at registration time rather than halfway through the first run.
 
-The engine never calls `cds.connect.to('db')` directly from the hot path. Every write is dispatched through the resolved target adapter, and the factory in `srv/adapters/targets/factory.js` refuses to silently fall back to the local DB for un-adaptered non-`db` targets.
+Every write is dispatched through the resolved target adapter. Non-`db` targets without a `target.adapter` class reference are rejected at registration — there is no silent fallback to the local DB.
 
-## Factory resolution order
+## Resolution order
 
 `addPipeline(...)` resolves the target adapter in this order:
 
-1. `config.target.adapter` — class reference extending `BaseTargetAdapter`. Full control; skips the service-based dispatch.
+1. `config.target.adapter` — class reference extending `BaseTargetAdapter`. Full control; takes precedence over `target.service`.
 2. `config.target.service` unset or `'db'` → built-in `DbTargetAdapter`.
-3. `config.target.kind` (`'odata' | 'odata-v2'`) — explicit transport selector. Wins over the connected service's auto-detected kind.
+3. `config.target.kind` (`'odata' | 'odata-v2'`) — explicit transport selector. Takes precedence over the connected service's auto-detected kind.
 4. Auto-detected `service.options.kind` (`'odata' | 'odata-v2'`) on the connected remote service → built-in `ODataTargetAdapter`.
-5. Any other `config.target.service` with no `target.adapter` → **registration error** pointing to [Custom target adapter](custom.md). The factory does not silently fall back to the local DB.
+5. Any other `config.target.service` with no `target.adapter` → **registration error** pointing to [Custom target adapter](custom.md).
 
 ## Built-in target adapters
 
@@ -57,7 +57,7 @@ The engine never calls `cds.connect.to('db')` directly from the hot path. Every 
 
 ## Capability gating
 
-Registration (`DataPipelineService._validateTargetCapabilities`) rejects incompatible configs by consulting the target adapter's `capabilities()`:
+`addPipeline` rejects incompatible configs by consulting the target adapter's `capabilities()`:
 
 | Config | Required capability |
 |---|---|
@@ -65,16 +65,16 @@ Registration (`DataPipelineService._validateTargetCapabilities`) rejects incompa
 | `mode: 'full'` | `truncate` **or** `batchDelete` |
 | `source.query` (query-shape) | `batchInsert` |
 
-Omitted keys default to `false`. Advertise only what your adapter actually supports — the engine will reject users at `addPipeline(...)` rather than halfway through the first run. The default `DbTargetAdapter` reports all four capabilities as `true`, so the standard DB-backed path is unaffected.
+Omitted keys default to `false`. Report only what your adapter actually supports — `addPipeline` rejects users at registration rather than halfway through the first run. The default `DbTargetAdapter` reports all four capabilities as `true`.
 
 ## Transactional semantics
 
-The engine wraps the WRITE loop in a `cds.tx` transaction only for query-shape (snapshot) pipelines — so `truncate` / `deleteSlice` + batch `INSERT`s commit atomically and a mid-run crash leaves the previous snapshot intact. Entity-shape (UPSERT) pipelines run without an outer transaction: each batch commits on its own so partial progress survives interruptions.
+Query-shape (snapshot) pipelines run inside a `cds.tx` transaction — so `truncate` / `deleteSlice` + batch `INSERT`s commit atomically and a mid-run crash leaves the previous snapshot intact. Entity-shape (UPSERT) pipelines run without an outer transaction: each batch commits on its own so partial progress survives interruptions.
 
-Target adapters do not have to manage `cds.tx` themselves; they inherit the ambient `cds.context` / transaction from the engine. Custom remote-protocol adapters (e.g. a reporting-service adapter) need to surface their own atomicity guarantees at the service boundary — the engine's `cds.tx` does not span remote HTTP calls.
+Target adapters do not have to manage `cds.tx` themselves; they inherit the ambient `cds.context` / transaction. Custom remote-protocol adapters (e.g. a reporting-service adapter) need to surface their own atomicity guarantees at the service boundary — `cds.tx` does not span remote HTTP calls.
 
 ## See also
 
-- [Concepts → Inference rules](../concepts/inference.md) — target dispatch and the full capability-gated registration matrix.
+- [Concepts → Inference rules](../concepts/inference.md) — target adapter selection and the full registration matrix.
 - [Sources](../sources/index.md) — the peer section covering the READ phase.
 - [Recipes → Custom target adapter](../recipes/custom-target-adapter.md) — end-to-end reporting-service example.

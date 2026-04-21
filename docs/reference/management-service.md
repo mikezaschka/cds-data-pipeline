@@ -1,10 +1,10 @@
 # Management Service
 
-The `cds-data-pipeline` engine exposes an OData service at `/pipeline` for inspecting and controlling registered pipelines at runtime. Every pipeline registered via `addPipeline(...)` surfaces here with its tracker state, run history, and manual-trigger actions.
+`cds-data-pipeline` exposes an OData service at `/pipeline` for inspecting and controlling registered pipelines at runtime. Every pipeline registered via `addPipeline(...)` surfaces here with its tracker state, run history, and manual-trigger actions.
 
 ## Tracker schema
 
-The tracker tables are shipped as a CDS model under namespace `plugin.data_pipeline` in `db/index.cds`. They are materialized by `cds deploy` (SQLite) or the HDI deployer (HANA) — the plugin performs no runtime DDL.
+The tracker tables are exposed as a CDS model under namespace `plugin.data_pipeline`. They are materialized by `cds deploy` (SQLite) or the HDI deployer (HANA) — the plugin performs no runtime DDL.
 
 ```cds
 namespace plugin.data_pipeline;
@@ -97,7 +97,7 @@ GET /pipeline/Pipelines
 | `mode` | Effective run mode — `delta` or `full`. |
 | `lastSync` | ISO timestamp of the last successful run (delta watermark for timestamp mode). |
 | `lastKey` | High-watermark key value for `key` delta mode. |
-| `status` | `idle` \| `running` \| `failed`. The concurrency guard flips this to `running` via an optimistic `UPDATE … WHERE status != 'running'`. |
+| `status` | `idle` \| `running` \| `failed`. The concurrency guard flips this to `running`; parallel trigger attempts are rejected. |
 | `errorCount` | Cumulative count of failed runs since the last successful one. |
 | `lastError` | Last error message (truncated). |
 | `statistics` | Cumulative `created` / `updated` / `deleted` counts across all runs. |
@@ -145,7 +145,7 @@ Authorization: Bearer <token with PipelineRunner scope>
 | `name` | yes | — | Name of a pipeline registered via `addPipeline(...)`. |
 | `mode` | no | `delta` (entity-shape) / `full` (query-shape) | Run mode for this invocation. |
 | `trigger` | no | `manual` | Recorded as the `trigger` column on `PipelineRuns`. Whitelisted to the `RunTrigger` enum values. Use `external` for runs fired by an external scheduler so the run history is attributed correctly. |
-| `async` | no | `false` | If `true`, the action dispatches the run via `cds.spawn` and returns `202 Accepted` immediately. Use this when the pipeline may exceed the caller's HTTP response window (JSS has a fixed timeout). Errors during the async run still land in `PipelineRuns`. |
+| `async` | no | `false` | If `true`, the run is dispatched asynchronously (via `cds.spawn`) and the action returns `202 Accepted` immediately. Use this when the pipeline may exceed the caller's HTTP response window (JSS has a fixed timeout). Errors during the async run still land in `PipelineRuns`. |
 
 See the external-trigger walkthrough at [Recipes → External scheduling with SAP BTP Job Scheduling Service](../recipes/external-scheduling-jss.md).
 
@@ -215,7 +215,7 @@ await pipelines.run('BusinessPartners');
 
 ### Event hooks
 
-Pipeline events are namespaced to avoid collision with CAP's CRUD aliases (`READ`, `WRITE`):
+Pipelines emit three events per run:
 
 | Event | Fires | `req.data` contains |
 |---|---|---|
@@ -229,10 +229,10 @@ Hooks register via the standard CAP API: `srv.before/on/after(event, pipelineNam
     Per CAP convention: `before` and `on` hooks receive `(req)`; `after` hooks receive `(results, req)`. For non-READ events `results` is usually `undefined`, so `after` hooks should read and mutate state on the second argument (`req.data`).
 
 !!! note "Ordering"
-    Multiple hooks for the same `(event, path)` run in parallel via `Promise.all`. If you need sequential ordering, use `srv.prepend(() => srv.before(...))`.
+    Multiple hooks for the same `(event, path)` run in parallel. For sequential ordering, register with `srv.prepend(() => srv.before(...))`.
 
 ## See also
 
-- [Reference → Features](features.md) — consumer-facing capability overview for the engine.
+- [Reference → Features](features.md) — consumer-facing capability overview.
 - [Concepts → Terminology](../concepts/terminology.md) — the event namespace and tracker primitives.
 - [Concepts → Inference rules](../concepts/inference.md) — how `addPipeline(...)` derives behavior from the config shape.

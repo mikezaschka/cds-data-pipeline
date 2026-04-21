@@ -5,11 +5,11 @@ hide:
 
 # Sources
 
-The **source** side of a pipeline owns the `PIPELINE.READ` phase. A source adapter bridges a transport-specific read (OData V4, OData V2, REST, CQN) to the uniform `readStream(tracker)` contract the engine consumes.
+The **source** side of a pipeline owns the `PIPELINE.READ` phase. A source adapter bridges a transport-specific read (OData V4, OData V2, REST, CQN) to a uniform streaming contract the plugin consumes.
 
-One adapter is resolved per pipeline at registration time via the factory in `srv/adapters/factory.js`. The engine itself never issues `SELECT` or HTTP calls directly — every read is dispatched through the resolved source adapter.
+One source adapter is resolved per pipeline at registration time.
 
-## Factory resolution order
+## Resolution order
 
 `addPipeline(...)` resolves the source adapter in this order:
 
@@ -58,7 +58,7 @@ One adapter is resolved per pipeline at registration time via the factory in `sr
 
     ---
 
-    Extend `BaseSourceAdapter` to read from a transport the engine does not ship. Worked example: a CSV-file source adapter.
+    Extend `BaseSourceAdapter` to read from a transport the plugin does not ship. Worked example: a CSV-file source adapter.
 
     [:octicons-arrow-right-24: Custom source adapter](custom.md)
 

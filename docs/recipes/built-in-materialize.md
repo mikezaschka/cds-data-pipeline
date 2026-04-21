@@ -2,7 +2,7 @@
 
 **When to pick this recipe:** you want to store the result of a SELECT query — aggregates, joins, DISTINCT, computed columns — as a snapshot in a target table, refreshed on a schedule. Source is a CQN-native service (in-process CAP service, `cds.requires` DB binding), target is the local DB, no custom code.
 
-Inference: a pipeline is *query-shape* when `addPipeline(...)` is given a `source.query` closure. The engine infers `mode: 'full'` and dispatches writes through the default [`DbTargetAdapter`](../targets/db.md) (see [Inference rules](../concepts/inference.md)). "Materialize" is a doc-level use-case label — nothing is stored on the pipeline row.
+Inference: a pipeline is *query-shape* when `addPipeline(...)` is given a `source.query` closure. `mode: 'full'` is inferred and writes go through the default [`DbTargetAdapter`](../targets/db.md) (see [Inference rules](../concepts/inference.md)). "Materialize" is a doc-level use-case label — nothing is stored on the pipeline row.
 
 Materialize pipelines are always paired with the [CQN adapter](../sources/cqn.md). Other source adapters are not appropriate: CAP cannot translate aggregate queries across OData or REST, and entity-shape reads cannot express GROUP BY.
 
@@ -92,10 +92,10 @@ entity DailyCustomerRevenue {
     };
     ```
 
-The presence of `source.query` tells the engine this is a query-shape (snapshot-write) pipeline; `mode: 'full'` and `delta.mode: 'full'` are the inferred defaults. Snapshot writes require a target adapter that advertises `batchInsert: true` — the default `DbTargetAdapter` does.
+The presence of `source.query` marks this as a query-shape (snapshot-write) pipeline; `mode: 'full'` and `delta.mode: 'full'` are the inferred defaults. Snapshot writes require a target adapter that supports `batchInsert` — the default `DbTargetAdapter` does.
 
 !!! warning "Don't `await` the query inside the closure"
-    `cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the CQN adapter extracts the underlying `.SELECT` and dispatches it through `service.run(...)` against the configured source service.
+    `cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the SELECT runs against the configured source service.
 
 ### Interpolating the tracker watermark
 
@@ -115,8 +115,8 @@ The equivalent on the builder is `.where({ status: 'completed', modifiedAt: { '>
 ### What happens at runtime
 
 1. Schedule fires (or the run is triggered manually via the management service).
-2. The engine opens a transaction.
-3. The CQN adapter calls `source.query(tracker)` and executes the returned CQN against `SalesService`.
+2. A transaction is opened.
+3. `source.query(tracker)` is called and the returned CQN is executed against `SalesService`.
 4. The snapshot is cleared (`DELETE FROM reporting.DailyCustomerRevenue`).
 5. The MAP phase runs (default: identity — aggregate results already match the target shape); user hooks can enrich.
 6. The WRITE phase inserts the aggregated rows.
@@ -136,18 +136,18 @@ refresh: {
 },
 ```
 
-The engine deletes rows matching the slice predicate before inserting the new aggregate rows. The source query should be narrowed to produce the same slice (or the engine will over-produce and the INSERT will collide with the unchanged rows).
+Rows matching the slice predicate are deleted before the new aggregate rows are inserted. The source query should be narrowed to produce the same slice (otherwise the INSERT will collide with the unchanged rows).
 
 ### Event hooks
 
-All standard pipeline hooks (`PIPELINE.READ`, `PIPELINE.MAP`, `PIPELINE.WRITE`) fire for materialize runs exactly as they do for replicate. The WRITE phase receives the aggregated rows in `req.data.targetRecords` and the engine handles the `DELETE + INSERT`; user WRITE hooks can observe or replace the default write path.
+All standard pipeline hooks (`PIPELINE.READ`, `PIPELINE.MAP`, `PIPELINE.WRITE`) fire for materialize runs exactly as they do for replicate. The WRITE phase receives the aggregated rows in `req.data.targetRecords` and runs the default `DELETE + INSERT`; user WRITE hooks can observe or replace the default write path.
 
 ## Constraints
 
 - `source.query` is required (that is the signal that makes the pipeline query-shape in the first place).
 - Row-delta modes (`timestamp`, `key`, `datetime-fields`) are rejected — they do not fit aggregate semantics. Only `refresh: 'full'` and `refresh: { mode: 'partial', slice }` are recognized.
 - `refresh: 'full'` is not crash-safe beyond the transaction boundary. The snapshot is consistent per successful run; mid-run crashes leave the previous snapshot intact but do not resume.
-- The aggregate result is read in one batch. Very large aggregates should be partitioned via multiple pipelines over non-overlapping slices, or via the future `source.batchBy` stub.
+- The aggregate result is read in one batch. Very large aggregates should be partitioned via multiple pipelines over non-overlapping slices.
 
 ## See also
 

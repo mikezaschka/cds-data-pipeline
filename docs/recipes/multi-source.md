@@ -90,13 +90,13 @@ module.exports = async () => {
 
 Two sibling pipelines, one shared target, independent `lastSync` / `lastKey` watermarks per origin. A DEV outage does not stall the PROD delta.
 
-## 4 — What the engine does with `origin`
+## 4 — What `origin` does
 
 | Phase | With `source.origin` set | Without `source.origin` |
 |---|---|---|
-| Registration | Writes `origin` to `Pipelines.origin`; the startup log line gains `, origin=DEV` | No origin on the tracker row |
+| Registration | Writes `origin` to `Pipelines.origin` | No origin on the tracker row |
 | Default MAP | Stamps `record.source = origin` on every mapped row before WRITE | No stamp |
-| Default WRITE | Re-stamps `source = origin` (belt-and-braces for consumer MAP overrides), then UPSERTs with the compound key `(businessKey, source)` | UPSERTs with the declared business key only |
+| Default WRITE | Re-stamps `source = origin`, then UPSERTs with the compound key `(businessKey, source)` | UPSERTs with the declared business key only |
 | `mode: 'full'` pre-sync | `DELETE FROM target WHERE source = <origin>` — sibling origins survive | Full `DELETE FROM target` |
 | `flush` (`POST /pipeline/flush`) | Same per-origin scoped DELETE | Full `DELETE FROM target` |
 
@@ -141,10 +141,10 @@ The tracker is reset for `BP_DEV` (`lastSync`, `lastKey`, statistics → zero); 
 
 ## Constraints & notes
 
-- **One `cds.requires` entry per backend.** Destination multiplexing inside the engine (`cds.connect.to(svc, { credentials: { destination } })` per pipeline) is explicitly unsupported. If you need two destinations, define two `cds.requires` entries.
+- **One `cds.requires` entry per backend.** Switching destinations at runtime is not supported. If you need two destinations, define two `cds.requires` entries.
 - **Origin is a label, not a transport.** The plugin does not parse it, does not route on it, does not validate it against the `cds.requires` key. Use whatever string your ops team reads in the management UI.
 - **Projections and UI.** Downstream `@readonly` projections often want "a canonical row per business key". Use `where source = 'PROD'` or `exclude { source }` on the projection to filter or drop the discriminator; see [Concepts → Consumption views](../concepts/consumption-views.md).
-- **Legacy pipelines are unaffected.** Pipelines without `source.origin` behave exactly as before — `Pipelines.origin` is `null`, the stamp is a no-op, `flush` and `mode: 'full'` truncate the full target.
+- **Pipelines without `source.origin`** — `Pipelines.origin` is `null`, the stamp is a no-op, `flush` and `mode: 'full'` truncate the full target.
 
 ## See also
 

@@ -26,7 +26,7 @@ Unlike OData, REST services have no `model:` entry — there is nothing for CAP 
 
 ## Registering a REST pipeline
 
-The pipeline addresses the source via `config.rest.path` instead of `source.entity`. The engine's registration validator accepts `rest.path` as an entity-shape signal (see [Inference rules → Registration validation](../concepts/inference.md#registration-validation-matrix)), so no `kind` argument is needed.
+The pipeline addresses the source via `config.rest.path` instead of `source.entity`. `rest.path` alone is enough to mark the pipeline as entity-shape (see [Inference rules](../concepts/inference.md#registration-validation-matrix)).
 
 ```javascript
 const cds = require('@sap/cds');
@@ -163,7 +163,7 @@ Set `rest.dataPath: 'results'` to tell the adapter where the records live. Omit 
 
 ## Headers and auth
 
-Any headers configured on the `cds.requires.<service>.credentials` block (or supplied via CAP's destination binding) are applied automatically. The adapter uses `srv.send()` internally, so any mechanism that works for plain `cds.connect.to('RestProvider').send(...)` works here — OAuth tokens, API keys, CSRF headers, etc.
+Any headers configured on the `cds.requires.<service>.credentials` block (or supplied via CAP's destination binding) are applied automatically. Any auth mechanism that works for plain `cds.connect.to('RestProvider').send(...)` works here — OAuth tokens, API keys, CSRF headers, etc.
 
 ## Mapping REST fields to target columns
 

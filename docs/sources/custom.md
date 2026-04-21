@@ -1,8 +1,8 @@
 # Custom source adapter
 
-When the transport you need to read from is not one of the built-in kinds (OData V2 / V4, REST, CQN), write a source adapter. Extend `BaseSourceAdapter` and implement `readStream(tracker)` as an async generator; the engine plugs it in via `config.source.adapter`.
+When the transport you need to read from is not one of the built-in kinds (OData V2 / V4, REST, CQN), write a source adapter. Extend `BaseSourceAdapter` and implement `readStream(tracker)` as an async generator, then pass the class via `config.source.adapter`.
 
-The engine never calls `cds.connect.to(...)` or issues HTTP / SQL directly during the READ phase — every read is dispatched through the resolved source adapter, so a custom adapter has the same first-class standing as the built-in ones.
+Custom source adapters have the same standing as the built-in ones — every READ goes through the resolved adapter.
 
 ## Contract
 
@@ -11,7 +11,7 @@ const BaseSourceAdapter = require('cds-data-pipeline/srv/adapters/BaseSourceAdap
 
 class MyAdapter extends BaseSourceAdapter {
     async *readStream(tracker) {
-        // Yield arrays of plain-object records. Engine awaits each yield
+        // Yield arrays of plain-object records. The caller awaits each yield
         // before asking for the next — respect backpressure.
     }
 
@@ -35,9 +35,9 @@ Inputs available inside `readStream(tracker)`:
 
 Adapters must translate the `config.delta` + `tracker` state into a source-side predicate themselves (OData `$filter`, REST query param, CQN `WHERE`, …). Query-shape pipelines (with `config.source.query` present) sidestep delta — the user's closure decides whether to gate on the tracker.
 
-## Factory resolution order
+## Resolution order
 
-The source-adapter factory in `srv/adapters/factory.js` resolves adapters in this order:
+Source adapters are resolved in this order:
 
 1. `config.source.adapter` — class reference extending `BaseSourceAdapter`. Full control; skips everything below.
 2. `config.source.kind` — explicit transport selector: `'cqn' | 'odata' | 'odata-v2' | 'rest'`.
@@ -118,7 +118,7 @@ await pipelines.addPipeline({
 
 ## See also
 
-- [Sources → overview](index.md) — factory resolution order and the built-in adapters.
+- [Sources → overview](index.md) — resolution order and the built-in adapters.
 - [Targets → Custom target adapter](../targets/custom.md) — the peer contract for the WRITE phase.
 - [Recipes → Custom source adapter](../recipes/custom-source-adapter.md) — scenario-driven walkthrough.
-- [Concepts → Inference rules](../concepts/inference.md) — read-shape inference and capability-gated validation matrix.
+- [Concepts → Inference rules](../concepts/inference.md) — read-shape inference and the validation matrix.

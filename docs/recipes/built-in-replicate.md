@@ -1,8 +1,8 @@
 # Built-in replicate
 
-**When to pick this recipe:** source is a service the engine already speaks (OData V2 / V4, REST, or a CQN-native service), target is the local DB or a remote OData service, and you want row-preserving copy — one source row produces one target row, possibly filtered, projected, renamed. No custom code.
+**When to pick this recipe:** source is a service the plugin already speaks (OData V2 / V4, REST, or a CQN-native service), target is the local DB or a remote OData service, and you want row-preserving copy — one source row produces one target row, possibly filtered, projected, renamed. No custom code.
 
-This is the "replicate" use-case label — [Concepts → Inference rules](../concepts/inference.md) gives the formal rules. The engine decides this is an entity-shape pipeline because `source.entity` (or `rest.path`) is set and `source.query` is absent.
+This is the "replicate" use-case label — [Concepts → Inference rules](../concepts/inference.md) gives the formal rules. The pipeline is entity-shape because `source.entity` (or `rest.path`) is set and `source.query` is absent.
 
 ## To the local DB
 
@@ -53,7 +53,7 @@ module.exports = async () => {
 };
 ```
 
-The engine selects a source adapter based on the connected source service's kind (or an explicit `source.kind`):
+The source adapter is selected from the connected source service's kind (or an explicit `source.kind`):
 
 | Source transport | Adapter | Notes |
 |---|---|---|
@@ -61,11 +61,11 @@ The engine selects a source adapter based on the connected source service's kind
 | `kind: 'rest'` | `RestAdapter` | Cursor / offset / page pagination, timestamp delta via URL params. See [REST adapter](../sources/rest.md). |
 | `kind: 'cqn' \| 'postgres' \| 'hana' \| 'sqlite' \| …` | `CqnAdapter` | In-process CAP services and CQN-native DB bindings. See [CQN adapter](../sources/cqn.md). |
 
-Target-adapter resolution: with `target.service` unset (or `'db'`), the factory resolves [`DbTargetAdapter`](../targets/db.md). No `target.adapter` required.
+Target adapter selection: with `target.service` unset (or `'db'`), the default [`DbTargetAdapter`](../targets/db.md) is used. No `target.adapter` required.
 
 ## To a remote OData target
 
-If the destination is an OData service — you are "moving" data from one CAP-visible system to another — no custom adapter is needed either. Point `target.service` at a CAP service registered with `kind: 'odata'` (or `'odata-v2'`) and the factory resolves [`ODataTargetAdapter`](../targets/odata.md) automatically.
+If the destination is an OData service — you are "moving" data from one CAP-visible system to another — no custom adapter is needed either. Point `target.service` at a CAP service registered with `kind: 'odata'` (or `'odata-v2'`) and [`ODataTargetAdapter`](../targets/odata.md) is used automatically.
 
 ```javascript
 await pipelines.addPipeline({
@@ -82,12 +82,12 @@ await pipelines.addPipeline({
 });
 ```
 
-The OData target adapter routes writes through CAP's remote runtime (POST / PUT / PATCH / DELETE, with `$batch` change sets where supported) and reports all four capabilities, so `mode: 'delta'`, `mode: 'full'`, and `source.query` snapshots all register cleanly. Note that truncate and partial refresh do one DELETE per key — OData has no bulk DELETE, so large full-refresh sweeps are `O(n)` round-trips. See [Targets → OData](../targets/odata.md) for the full tuning table and known limitations.
+The OData target adapter routes writes through CAP's remote runtime (POST / PUT / PATCH / DELETE, with `$batch` change sets where supported) and supports `mode: 'delta'`, `mode: 'full'`, and `source.query` snapshots. OData has no bulk DELETE, so `truncate` and `deleteSlice` are `O(n)` round-trips on large targets — prefer `mode: 'delta'` for high-volume pipelines. See [Targets → OData](../targets/odata.md) for the full tuning table and known limitations.
 
 ## What happens at runtime
 
 1. Schedule fires (or a manual `run` is dispatched via the management service).
-2. The engine issues `PIPELINE.READ`; the source adapter returns an async iterable of source batches, filtered by the delta watermark when the mode is `delta`.
+2. `PIPELINE.READ` runs; the source adapter returns an async iterable of source batches, filtered by the delta watermark when the mode is `delta`.
 3. For each batch: `PIPELINE.MAP` applies view-mapping renames (via `viewMapping.remoteToLocal`) or any user MAP hooks.
 4. `PIPELINE.WRITE` upserts the mapped rows into the target entity through the resolved target adapter. UPSERT is idempotent across re-runs.
 5. The tracker row is updated with new `lastSync` / `lastKey` values.
@@ -95,7 +95,7 @@ The OData target adapter routes writes through CAP's remote runtime (POST / PUT 
 ## Constraints
 
 - `source.entity` (or `rest.path` for REST sources) is required.
-- `source.query` is not allowed — that signal switches the engine into query-shape (materialize) mode. See [Built-in materialize](built-in-materialize.md).
+- `source.query` is not allowed — that signal switches into query-shape (materialize) mode. See [Built-in materialize](built-in-materialize.md).
 - `mode` defaults to `'delta'`; pass `mode: 'full'` to force a wipe + full replay.
 
 ## See also

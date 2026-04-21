@@ -1,10 +1,10 @@
 # Features
 
-What `cds-data-pipeline` does today, grouped by capability. Every entry on this page is available in the current release. Programmatic API reference is in [Management Service](management-service.md); protocol-specific notes are in the [OData](../sources/odata.md) and [REST](../sources/rest.md) adapter pages.
+What `cds-data-pipeline` does, grouped by capability. Programmatic API reference is in [Management Service](management-service.md); protocol-specific notes are in the [OData](../sources/odata.md) and [REST](../sources/rest.md) adapter pages.
 
 ## Source adapters
 
-The READ phase of every pipeline uses a protocol-specific adapter. The factory auto-selects based on the remote service `kind`; custom adapters extend `BaseSourceAdapter` and implement `readStream(tracker)`.
+The READ phase of every pipeline uses a protocol-specific adapter. The adapter is selected automatically from the remote service's `kind`; custom adapters extend `BaseSourceAdapter` and implement `readStream(tracker)`.
 
 | Adapter | Protocol support | Reference |
 |---|---|---|
@@ -14,11 +14,11 @@ The READ phase of every pipeline uses a protocol-specific adapter. The factory a
 | **CQN** | Reads from CQN-native services (in-process CAP services, `cds.requires` DB bindings, CAP-wrapped legacy DBs). Serves both entity-shape (row-preserving) and query-shape (derived / aggregated snapshot) reads based on whether `source.query` is supplied. | [Sources → CQN Adapter](../sources/cqn.md) |
 | **Server-driven paging** | Adapters keep paging until the remote returns an empty batch — transparent to the replication config. | Applies to OData V4 and V2 adapters. |
 | **Multi-source fan-in** | Consolidate the same logical entity from N backends into one target table via sibling pipelines, each stamping a `source.origin` label into a `source` key column contributed by the `plugin.data_pipeline.sourced` aspect. Per-origin `flush` and `mode: 'full'` scope DELETEs to their own origin. | [Recipes → Multi-source](../recipes/multi-source.md) |
-| **Factory + custom base class** | Auto-selection based on `cds.requires.<service>.kind`, or explicit routing via `source.kind` / `source.adapter` class ref. Custom adapters extend `BaseSourceAdapter`. | [Sources → Custom source adapter](../sources/custom.md) |
+| **Auto-selection + custom base class** | Selected automatically from the service's `kind`, or routed explicitly via `source.kind` / `source.adapter` class ref. Custom adapters extend `BaseSourceAdapter`. | [Sources → Custom source adapter](../sources/custom.md) |
 
 ## Target adapters
 
-The WRITE phase (and pre-write truncate / delete-slice) is delegated to a `BaseTargetAdapter`. The factory resolves the adapter from `target.adapter` (class ref) or `target.service` (with `db` / unset → `DbTargetAdapter`).
+The WRITE phase (and pre-write truncate / delete-slice) is delegated to a `BaseTargetAdapter`. The adapter is resolved from `target.adapter` (class ref) or `target.service` (with `db` / unset → `DbTargetAdapter`).
 
 | Adapter | Primitives | Reference |
 |---|---|---|

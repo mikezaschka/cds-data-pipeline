@@ -1,8 +1,8 @@
 # Inference rules and registration validation
 
-`addPipeline(...)` infers pipeline behavior from the shape of `source` and `target`. There is **no `kind` argument** — passing one has no effect. The engine dispatches through two factories (source-adapter and target-adapter); nothing in the hot path branches on a stored discriminator.
+`addPipeline(...)` infers pipeline behavior from the shape of `source` and `target`.
 
-"Replicate", "materialize", and "move-to-service" remain useful **use-case labels** in the recipes and README — they name three common combinations of read shape and target destination — but they are documentation vocabulary, not a runtime enum.
+"Replicate", "materialize", and "move-to-service" are **documentation use-case labels** — they name three common combinations of read shape and target destination, but they are not a field on `addPipeline(...)` and not a column on the tracker.
 
 ## Inference rules
 
@@ -15,23 +15,19 @@
 | Both present | Error — ambiguous source shape. |  |
 | Neither present | Error — missing source shape. |  |
 
-### Target dispatch
+### Target adapter selection
 
-The target adapter is resolved by the factory in `srv/adapters/targets/factory.js`:
-
-| Config | Resolved target adapter |
+| Config | Target adapter |
 |---|---|
-| `target.adapter: MyTargetAdapter` (class ref) | Instantiates the supplied class. Factory skips the service-based dispatch. |
+| `target.adapter: MyTargetAdapter` (class ref) | The supplied class is used; `target.service` is ignored for dispatch. |
 | `target.service` unset or `'db'` | `DbTargetAdapter` — writes via `cds.connect.to('db')`. |
 | `target.service` set to any other value with no `target.adapter` | **Error** — no built-in adapter for non-`db` services. See [Custom target adapter](../targets/custom.md). |
 
-This replaces the pre-capability-layer behaviour where `target.service = 'SomeRemoteService'` used to register silently and fall through to local DB writes. Registering an un-adaptered non-`db` target now fails fast.
-
 ## Registration validation matrix
 
-`_validateConfig` and `_validateTargetCapabilities` in `DataPipelineService` reject incoherent configs at registration time. Every row is grounded in a concrete conflict between config and adapter capability.
+`addPipeline` rejects incoherent configs at registration time. Every row is grounded in a concrete conflict between config and adapter capability.
 
-| # | Config conflict | Engine response |
+| # | Config conflict | Response |
 |---|---|---|
 | 1 | `source.query` AND `source.entity` (or `rest.path`) both set | Error — ambiguous source shape |
 | 2 | neither `source.query` nor `source.entity` / `rest.path` | Error — missing source shape |
@@ -44,7 +40,7 @@ This replaces the pre-capability-layer behaviour where `target.service = 'SomeRe
 | 9 | `source.origin` + `source.query` | Error — materialize (query-shape) rebuilds the snapshot and is origin-agnostic |
 | 10 | `source.origin` + target entity missing `key source : String` (aspect `plugin.data_pipeline.sourced`) | Error — stamp has nowhere to land; import the aspect from `cds-data-pipeline/db` |
 
-Rows 6–8 are evaluated against the `capabilities()` object advertised by the resolved `TargetAdapter`. The default `DbTargetAdapter` reports all four capabilities as `true`, so the standard DB-backed path is unaffected.
+Rows 6–8 are evaluated against the `capabilities()` reported by the resolved target adapter.
 
 Rows 9–10 cover the multi-source fan-in rules. See the [Multi-source](../recipes/multi-source.md) recipe for the end-to-end pattern.
 
@@ -55,9 +51,9 @@ Rows 9–10 cover the multi-source fan-in rules. See the [Multi-source](../recip
 | Read shape | `source.origin` set | Outcome |
 |---|---|---|
 | Entity-shape (replicate / move-to-service) | yes | Default MAP writes `record.source = origin`; UPSERT uses the compound key `(businessKey, source)`; `flush` and `mode: 'full'` scope their DELETE to `source = <origin>` |
-| Entity-shape | no | Legacy single-origin behavior — no stamp, full-table truncate on flush / `mode: 'full'` |
+| Entity-shape | no | Single-origin behaviour — no stamp, full-table truncate on flush / `mode: 'full'` |
 | Query-shape (materialize) | yes | **Rejected at registration** (row 9 above) |
-| Query-shape | no | Legacy materialize — snapshot rebuilds the whole target per `refresh` scope |
+| Query-shape | no | Standard materialize — snapshot rebuilds the whole target per `refresh` scope |
 
 The target entity must mix in the `plugin.data_pipeline.sourced` aspect (or declare `key source : String(N)` directly) whenever any pipeline writes an origin into it; this is row 10 of the validation matrix. See [Multi-source fan-in](../recipes/multi-source.md) for the aspect import, association-`source` extension, and per-origin flush assertion.
 
@@ -115,23 +111,23 @@ See [Custom target adapter](../targets/custom.md) for how to implement `Reportin
 
 ## Observability
 
-At registration the engine emits one log line per pipeline, composed from the inference above:
+At registration the plugin logs one line per pipeline so the inference is visible in the startup log:
 
 ```
-[cds-data-pipeline] registered 'OrdersCopy' — entity-shape from reporting.reporting.Orders → db.db.ArchivedOrders, mode=delta(timestamp modifiedAt), adapter=CqnAdapter
+[cds-data-pipeline] registered 'OrdersCopy' — entity-shape from reporting.reporting.Orders → db.db.ArchivedOrders, mode=delta(timestamp modifiedAt)
 ```
 
-The line names the read shape, source and target references, the effective mode + delta mode, and the source adapter class resolved for the READ phase — so the inference is visible without reading any documentation.
+The line names the read shape, source and target references, and the effective mode + delta mode.
 
-When `source.origin` is set, the line gains a trailing `, origin=<label>` so multi-source setups are self-documenting in the startup log:
+When `source.origin` is set, the line gains a trailing `, origin=<label>` so multi-source setups are self-documenting:
 
 ```
-[cds-data-pipeline] registered 'BP_DEV' — entity-shape from API_BP_DEV.A_BusinessPartner → db.BusinessPartners, mode=delta(timestamp modifiedAt), adapter=ODataAdapter, origin=DEV
+[cds-data-pipeline] registered 'BP_DEV' — entity-shape from API_BP_DEV.A_BusinessPartner → db.BusinessPartners, mode=delta(timestamp modifiedAt), origin=DEV
 ```
 
 ## See also
 
-- [Recipes → Built-in replicate](../recipes/built-in-replicate.md), [Built-in materialize](../recipes/built-in-materialize.md), [Custom target adapter](../recipes/custom-target-adapter.md), [Write-hook override](../recipes/write-hook-override.md)
+- [Recipes → Built-in replicate](../recipes/built-in-replicate.md), [Built-in materialize](../recipes/built-in-materialize.md), [Custom target adapter](../recipes/custom-target-adapter.md), [Event hooks](../recipes/event-hooks.md)
 - [Concepts → Terminology](terminology.md)
 - [Sources → CQN adapter](../sources/cqn.md)
 - [Sources → Custom source adapter](../sources/custom.md) · [Targets → Custom target adapter](../targets/custom.md)

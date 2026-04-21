@@ -60,7 +60,7 @@ nav:
       - Multi-source fan-in: recipes/multi-source.md
       - Custom source adapter: recipes/custom-source-adapter.md
       - Custom target adapter: recipes/custom-target-adapter.md
-      - Write-hook override: recipes/write-hook-override.md
+      - Event hooks: recipes/event-hooks.md
       - External scheduling (JSS): recipes/external-scheduling-jss.md
       - Internal scheduling (queued): recipes/internal-scheduling-queued.md
   - Reference:

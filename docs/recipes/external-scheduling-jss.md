@@ -7,9 +7,8 @@ The plugin is pluggable by design: omit `schedule` in `addPipeline(...)` and no 
 ```mermaid
 flowchart LR
   JSS[BTP Job Scheduling Service] -->|"OAuth2 client creds POST /pipeline/run"| Mgmt[DataPipelineManagementService]
-  Mgmt -->|srv.run| Core[DataPipelineService]
-  Core -->|execute| Pipe[Pipeline]
-  Pipe -->|"INSERT trigger='external'"| Tracker[(PipelineRuns)]
+  Mgmt --> Pipe[Pipeline runs]
+  Pipe -->|"trigger=external"| Tracker[(PipelineRuns)]
 ```
 
 ## 1. Register the pipeline without an internal schedule
@@ -124,7 +123,7 @@ Key fields:
 
 - Tail the app logs — you should see the registration log without the internal-schedule hint.
 - Trigger the JSS job manually once; check `GET /pipeline/PipelineRuns?$filter=pipeline_name eq 'BusinessPartners'&$orderby=startTime desc&$top=1`. The top row should show `trigger='external'` and a completed status.
-- If JSS reports a 409 or "skipped" message in the plugin logs, a previous run is still in progress. The concurrency guard (optimistic `UPDATE … WHERE status != 'running'`) blocks overlap — increase the cron interval or keep `async: true` so JSS doesn't wait on the in-flight run.
+- If JSS reports a 409 or "skipped" message in the plugin logs, a previous run is still in progress. The concurrency guard blocks overlap — increase the cron interval or keep `async: true` so JSS doesn't wait on the in-flight run.
 - If JSS reports a 403, the XSUAA scope grant didn't land — re-check `grant-as-authority-to-apps` and rebind the JSS instance.
 
 ## Action parameter reference

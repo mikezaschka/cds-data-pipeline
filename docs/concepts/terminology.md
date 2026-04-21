@@ -1,6 +1,6 @@
 # Terminology
 
-The vocabulary `cds-data-pipeline` uses — scoped to the engine itself.
+The vocabulary `cds-data-pipeline` uses.
 
 ---
 
@@ -8,7 +8,7 @@ The vocabulary `cds-data-pipeline` uses — scoped to the engine itself.
 
 A **pipeline** is a linear `READ → MAP → WRITE` job between exactly one source and one target, with built-in tracker, retry, concurrency guard, and event hooks. Pipelines are registered programmatically via `cds.connect.to('DataPipelineService').addPipeline({ ... })` and scheduled (periodic) or triggered (one-shot).
 
-Pipeline behaviour — row-preserving copy vs. aggregated snapshot vs. cross-service move — is **inferred from the config shape**, not from a stored discriminator. See [Inference rules](inference.md) for the full table and the registration-time validation matrix. The three recipe names (**replicate**, **materialize**, **move-to-service**) are doc-level use-case labels — they describe common combinations of read shape and target destination, but they are not a field on `addPipeline(...)` or a column on the tracker.
+Pipeline behaviour — row-preserving copy vs. aggregated snapshot vs. cross-service move — is **inferred from the config shape**. See [Inference rules](inference.md) for the full table and the configs that are rejected at registration. The three recipe names (**replicate**, **materialize**, **move-to-service**) are doc-level use-case labels — they describe common combinations of read shape and target destination, but they are not a field on `addPipeline(...)` or a column on the tracker.
 
 ---
 
@@ -16,8 +16,8 @@ Pipeline behaviour — row-preserving copy vs. aggregated snapshot vs. cross-ser
 
 Every pipeline has **one source** and **one target**.
 
-- **Source** — a service (identified by a `cds.requires` key) plus an entity name, optionally with a CQN `query` closure that replaces entity-based reading with a custom SELECT. Source adapters bridge the service's transport (OData V4 / V2, REST, or a custom adapter) to the uniform `readStream(tracker)` contract the engine consumes.
-- **Target** — a service plus an entity name, typically a DB entity (`@cds.persistence.table`). The WRITE phase is dispatched through a [target adapter](../targets/index.md): the built-in [`DbTargetAdapter`](../targets/db.md) handles the common case (`target.service` unset or `'db'`); the built-in [`ODataTargetAdapter`](../targets/odata.md) handles remote OData services; everything else is covered by a [custom target adapter](../targets/custom.md) or a [`PIPELINE.WRITE` hook override](../recipes/write-hook-override.md). For replicate pipelines the target is most idiomatically a **consumption view** — a local `projection on <remote.Entity>` that also carries the column selection and rename mapping (see [Consumption views](consumption-views.md)).
+- **Source** — a service (identified by a `cds.requires` key) plus an entity name, optionally with a CQN `query` closure that replaces entity-based reading with a custom SELECT. Source adapters bridge the service's transport (OData V4 / V2, REST, or a custom adapter) to a uniform streaming contract the plugin consumes.
+- **Target** — a service plus an entity name, typically a DB entity (`@cds.persistence.table`). The WRITE phase is dispatched through a [target adapter](../targets/index.md): the built-in [`DbTargetAdapter`](../targets/db.md) handles the common case (`target.service` unset or `'db'`); the built-in [`ODataTargetAdapter`](../targets/odata.md) handles remote OData services; everything else is covered by a [custom target adapter](../targets/custom.md) or a [`PIPELINE.WRITE` event hook](../recipes/event-hooks.md#on-as-a-target-adapter-alternative). For replicate pipelines the target is most idiomatically a **consumption view** — a local `projection on <remote.Entity>` that also carries the column selection and rename mapping (see [Consumption views](consumption-views.md)).
 
 ---
 
@@ -29,7 +29,7 @@ Every pipeline has **one source** and **one target**.
 |---|---|---|
 | `full` | Read all rows from source. | Truncate target, then upsert fresh rows. Multi-source-aware truncate preserves rows from other pipelines writing to the same target. |
 | `delta` | Read only rows changed since the last successful run (using the source adapter's delta strategy). | Upsert the delta batch. No truncate. |
-| `partial-refresh` (planned) | Read a query-shaped slice of rows. | Replace the slice, leave other rows alone. |
+| `partial-refresh` | Read a query-shaped slice of rows. | Replace the slice, leave other rows alone. |
 
 Entity-shape pipelines default to `delta`; query-shape pipelines default to `full`. See [Inference rules](inference.md) for the full defaults table.
 
@@ -53,7 +53,7 @@ All three are implemented for OData V4 and V2. REST supports `timestamp` via con
 
 `Pipelines` and `PipelineRuns` are the two tracker entities exposed by the management OData service.
 
-- **Pipelines** — one row per registered pipeline. Carries source / target references, current `mode`, `lastSync`, `lastKey`, cumulative statistics, and status. No stored intent discriminator — behaviour is re-inferred at each registration (see [Inference rules](inference.md)).
+- **Pipelines** — one row per registered pipeline. Carries source / target references, current `mode`, `lastSync`, `lastKey`, cumulative statistics, and status. Behaviour is inferred from the current config at registration (see [Inference rules](inference.md)).
 - **PipelineRuns** — one row per invocation. Carries start / end timestamps, trigger type, per-phase statistics (`created` / `updated` / `deleted` / `skipped`), mode, and any error context for failed runs.
 
 See the [Management Service reference](../reference/management-service.md) for the OData shape and available actions.
@@ -62,11 +62,11 @@ See the [Management Service reference](../reference/management-service.md) for t
 
 ## Event namespace
 
-Engine event hooks use the `PIPELINE.*` namespace to avoid collision with CAP's CRUD aliases:
+Pipeline event hooks use the `PIPELINE.*` namespace:
 
 | Event | When it fires |
 |---|---|
-| `PIPELINE.READ` | Around the source adapter's `readStream(tracker)` call. |
+| `PIPELINE.READ` | Around the READ phase. |
 | `PIPELINE.MAP` | Around the transformation phase between read and write. Field renames are applied here via `config.viewMapping.remoteToLocal` when supplied by the caller; user `PIPELINE.MAP` hooks can override or extend the mapping. |
 | `PIPELINE.WRITE` | Around the UPSERT into the target entity. |
 

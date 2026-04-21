@@ -1,8 +1,8 @@
 # Custom source adapter
 
-**When to pick this recipe:** the source is not OData V2 / V4, not REST, and not a CQN-native CAP service — flat files (CSV, JSONL), proprietary HTTP APIs, message buses, S3 objects, whatever else. Writing a source adapter is the sanctioned extension point; the engine treats it on the same footing as the built-in adapters.
+**When to pick this recipe:** the source is not OData V2 / V4, not REST, and not a CQN-native CAP service — flat files (CSV, JSONL), proprietary HTTP APIs, message buses, S3 objects, whatever else. Writing a source adapter is the sanctioned extension point; custom adapters have the same standing as the built-in ones.
 
-For the formal contract and factory-resolution order see [Sources → Custom source adapter](../sources/custom.md). This page walks through a concrete scenario end-to-end.
+For the formal contract and resolution order see [Sources → Custom source adapter](../sources/custom.md). This page walks through a concrete scenario end-to-end.
 
 ## Scenario — import a CSV file on a schedule
 
@@ -98,7 +98,7 @@ module.exports = async () => {
         source: {
             service: 'db',                  // any connect-able service; used only for the proxy
             path: '/data/customers.csv',
-            adapter: CsvFileAdapter,        // wins over kind-based factory dispatch
+            adapter: CsvFileAdapter,        // takes precedence over source.kind
         },
         target: { entity: 'db.Customers' },
         delta: { mode: 'timestamp', field: 'modifiedAt' },
@@ -107,24 +107,24 @@ module.exports = async () => {
 };
 ```
 
-`source.adapter` is a class reference — the factory instantiates it once per pipeline, injects `this.service` / `this.config`, and calls `readStream(tracker)` at each run. Because `source.adapter` wins over the kind-based dispatch, the value of `source.service` is only used to provide `this.service` for adapters that want a CAP service handle; the CSV adapter above ignores it.
+`source.adapter` is a class reference — the plugin instantiates it once per pipeline, injects `this.service` and `this.config`, and calls `readStream(tracker)` at each run. Because `source.adapter` takes precedence over the kind-based dispatch, the value of `source.service` is only used to provide `this.service` for adapters that want a CAP service handle; the CSV adapter above ignores it.
 
 ## What happens at runtime
 
 1. The scheduler fires at midnight.
-2. The engine opens a tracker row and calls `CsvFileAdapter.readStream(tracker)`.
-3. The generator yields record batches; the engine awaits each one (backpressure) before requesting the next.
+2. A tracker row is opened and `CsvFileAdapter.readStream(tracker)` is called.
+3. The generator yields record batches; each one is awaited (backpressure) before the next is requested.
 4. `PIPELINE.MAP` runs per batch — identity by default, or a `remoteToLocal` rename if supplied.
 5. `DbTargetAdapter.writeBatch(records, { mode: 'upsert' })` UPSERTs into `db.Customers`.
 6. After the stream ends, the tracker row is updated with the new `lastSync`.
 
 ## When to pick this over a write-hook override
 
-Use a custom source adapter when you want the extension reusable across pipelines and composable with the standard target adapters. If the transformation is one-off and read-only (e.g. poking at a URL and shoving the result into the DB), a `PIPELINE.READ` event-hook override can also work — but the adapter route keeps the delta-watermark and backpressure handling with the engine contract.
+Use a custom source adapter when you want the extension reusable across pipelines and composable with the standard target adapters. If the transformation is one-off and read-only (e.g. poking at a URL and shoving the result into the DB), a `PIPELINE.READ` event-hook override can also work — but the adapter route keeps delta-watermark and backpressure handling on the standard contract.
 
 ## See also
 
 - [Sources → Custom source adapter](../sources/custom.md) — the formal `BaseSourceAdapter` contract.
-- [Sources → overview](../sources/index.md) — factory resolution order.
-- [Concepts → Inference rules](../concepts/inference.md) — how `source.adapter` interacts with the kind-based factory dispatch.
+- [Sources → overview](../sources/index.md) — resolution order.
+- [Concepts → Inference rules](../concepts/inference.md) — how `source.adapter` interacts with `source.kind`.
 - [Recipes → Custom target adapter](custom-target-adapter.md) — the peer recipe for the WRITE phase.

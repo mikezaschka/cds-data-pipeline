@@ -5,7 +5,7 @@ hide:
 
 # Concepts
 
-The small vocabulary `cds-data-pipeline` is built on. These pages cover the engine itself — the primitives behind `addPipeline(...)`, the inference rules, and the event namespace every pipeline exposes.
+The small vocabulary `cds-data-pipeline` is built on. These pages cover the pieces of `addPipeline(...)`, what the plugin infers from your config, and the event namespace every pipeline exposes.
 
 <div class="grid cards" markdown>
 
@@ -21,7 +21,7 @@ The small vocabulary `cds-data-pipeline` is built on. These pages cover the engi
 
     ---
 
-    How `addPipeline(...)` derives pipeline behavior from the config shape — read shape, write primitive, inferred defaults — and the registration-time validation matrix.
+    How `addPipeline(...)` derives pipeline behavior from the config shape — read shape, inferred defaults — and which config combinations are rejected at registration.
 
     [:octicons-arrow-right-24: Inference rules](inference.md)
 

@@ -2,14 +2,14 @@
 
 The CQN adapter reads from any CAP-addressable service whose wire protocol is native CQN: in-process CAP application services, `cds.requires` database bindings (`sqlite`, `hana`, `postgres`, `better-sqlite`, `sql`), CAP-wrapped legacy databases via `@sap/cds-dbs`. Unlike the OData and REST adapters, it does not translate queries across protocols — the query runs directly on the connected service.
 
-One adapter serves both pipeline read shapes. The config shape decides which branch runs; the adapter does not need a separate variant.
+The CQN adapter serves both pipeline read shapes:
 
 | Read shape | Signal | Target write | Delta modes |
 |---|---|---|---|
 | **Entity-shape** (row-preserving) | `source.entity` set, `source.query` absent | UPSERT per batch — idempotent across re-runs | `timestamp`, `key` |
 | **Query-shape** (derived snapshot) | `source.query(tracker)` closure returning a SELECT CQN | `DELETE + INSERT` (full refresh) or scoped `DELETE + INSERT` (partial refresh) | `full` (default), `partial-refresh` |
 
-Route to this adapter via `source.kind: 'cqn'` on the `addPipeline` config. (For CQN-kind `cds.requires` bindings the factory also routes here automatically — `source.kind: 'cqn'` is the explicit form.) See [Inference rules](../concepts/inference.md) for the full shape-to-behavior table.
+Route to this adapter via `source.kind: 'cqn'` on the `addPipeline` config. For CQN-kind `cds.requires` bindings the adapter is also selected automatically. See [Inference rules](../concepts/inference.md) for the full shape-to-behavior table.
 
 ## Entity-shape read (row-preserving)
 
@@ -34,18 +34,18 @@ await pipelines.addPipeline({
 await pipelines.run('ArchivedOrders');
 ```
 
-No `kind` argument — the presence of `source.entity` (and absence of `source.query`) tells the engine this is an entity-shape pipeline. See [Inference rules → Read shape](../concepts/inference.md#read-shape). The CQN adapter is selected automatically when the service declared in `cds.requires` has a CQN-native `kind` (`postgres`, `hana`, `sqlite`, `better-sqlite`, in-process CAP services, …), or explicitly via `source.kind: 'cqn'`.
+The presence of `source.entity` (and absence of `source.query`) marks this as an entity-shape pipeline. See [Inference rules → Read shape](../concepts/inference.md#read-shape). The CQN adapter is selected automatically when the service declared in `cds.requires` has a CQN-native `kind` (`postgres`, `hana`, `sqlite`, `better-sqlite`, in-process CAP services, …), or explicitly via `source.kind: 'cqn'`.
 
 ### Constraints
 
-- `source.entity` is required. If absent, the engine rejects the config as *missing source shape* (see [Inference rules → Registration validation](../concepts/inference.md#registration-validation-matrix)).
-- `source.query` is incompatible with entity-shape reads. If you want `source.query`, omit `source.entity`; the engine will infer query-shape semantics (see next section).
+- `source.entity` is required. If absent, `addPipeline` rejects the config as *missing source shape* (see [Inference rules → Registration validation](../concepts/inference.md#registration-validation-matrix)).
+- `source.query` is incompatible with entity-shape reads. If you want `source.query`, omit `source.entity`; the plugin will infer query-shape semantics (see next section).
 
 ## Query-shape read (derived snapshot)
 
 Derived / aggregated snapshot. The closure `source.query(tracker)` receives the pipeline's tracker row and returns a SELECT CQN — aggregates, GROUP BY, DISTINCT, computed columns, whatever the connected service can execute. The result is loaded into the target in a single batch (no pagination — aggregate results are typically small enough to fit in memory).
 
-`source.query` can be written in either CAP style — the fluent builder or `cds.ql` tagged templates. Both produce the same CQN; the CQN adapter extracts the `.SELECT` shape and runs it through `service.run(...)` either way. See the official CAP references: [CQL (Core Query Language)](https://cap.cloud.sap/docs/cds/cql), [CQN (Core Query Notation)](https://cap.cloud.sap/docs/cds/cqn), and [`cds.ql`](https://cap.cloud.sap/docs/node.js/cds-ql).
+`source.query` can be written in either CAP style — the fluent builder or `cds.ql` tagged templates. Both produce the same SELECT that the source service can run. See the official CAP references: [CQL (Core Query Language)](https://cap.cloud.sap/docs/cds/cql), [CQN (Core Query Notation)](https://cap.cloud.sap/docs/cds/cqn), and [`cds.ql`](https://cap.cloud.sap/docs/node.js/cds-ql).
 
 === "Fluent builder"
 
@@ -95,10 +95,10 @@ Derived / aggregated snapshot. The closure `source.query(tracker)` receives the 
     });
     ```
 
-The presence of `source.query` tells the engine this pipeline is query-shape. The inferred defaults are `mode: 'full'` and `delta.mode: 'full'`.
+The presence of `source.query` marks this pipeline as query-shape. The inferred defaults are `mode: 'full'` and `delta.mode: 'full'`.
 
 !!! warning "Don't `await` the query inside the closure"
-    `cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the adapter extracts the underlying `.SELECT` and dispatches it against the configured source service.
+    `cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the pipeline runs the SELECT against the configured source service.
 
 Tagged templates are especially convenient when the query depends on the tracker — `${...}` values are safely parameterized by CAP:
 
@@ -118,7 +118,7 @@ The equivalent on the builder is `.where({ status: 'completed', modifiedAt: { '>
 | Mode | Behavior | Idempotent? |
 |---|---|---|
 | `refresh: 'full'` (default) | `DELETE FROM target` + `INSERT` of the aggregated rows, wrapped in a single transaction. An aborted run rolls back and leaves the previous snapshot intact. | Yes — every run produces the same target state given the same source. |
-| `refresh: { mode: 'partial', slice: (tracker) => predicate }` | `DELETE FROM target WHERE <slice predicate>` + `INSERT`. Only rows matching the slice are replaced. The slice predicate is mandatory — the engine does not attempt to derive it from the source query. | Yes within the slice. |
+| `refresh: { mode: 'partial', slice: (tracker) => predicate }` | `DELETE FROM target WHERE <slice predicate>` + `INSERT`. Only rows matching the slice are replaced. The slice predicate is mandatory — it is not derived from the source query. | Yes within the slice. |
 
 The partial-refresh `slice` closure receives the same tracker row as `source.query` and must return a CQN WHERE predicate:
 

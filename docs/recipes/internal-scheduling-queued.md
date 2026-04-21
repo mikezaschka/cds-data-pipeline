@@ -2,18 +2,18 @@
 
 **When to pick this recipe:** you want a schedule owned by the CAP app (not an external service), you run the app with more than one instance, and you want the schedule to survive restarts, retry on failure, and fire **only once per tick across all instances**. This is the right upgrade from `schedule: <ms>` for production-grade deployments that don't justify the operational overhead of an external scheduler.
 
-The queued engine is backed by CAP's persistent task queue — `cds.queued(srv).schedule(...).every(...)` — which stores the schedule message in `cds.outbox.Messages` and dispatches it through a single active message processor per service / tenant / app instance / message.
+The queued engine is backed by CAP's persistent task queue: the schedule message is stored in `cds.outbox.Messages` and dispatched exactly once per interval.
 
 !!! warning "Alpha API"
-    The underlying `.schedule()` / `.every()` API is marked experimental in the [CAP task scheduling docs](https://cap.cloud.sap/docs/node.js/queue#task-scheduling) (introduced in `@sap/cds` 9.0, human-readable durations in 9.2). Semantics may still change. For workloads that can't absorb churn, prefer the default `spawn` engine or an external trigger.
+    The underlying `.schedule()` / `.every()` API is marked experimental in the [CAP task scheduling docs](https://cap.cloud.sap/docs/node.js/queue#task-scheduling). Semantics may still change. For workloads that can't absorb churn, prefer the default `spawn` engine or an external trigger.
 
 ## Engines at a glance
 
-| Engine | Cross-instance single-winner | Persistent across restarts | Retry + dead-letter | Requires outbox table | API stability |
-|---|---|---|---|---|---|
-| `spawn` (default) | No — each instance fires | No | No | No | GA |
-| `queued` (opt-in) | Yes | Yes | Yes | Yes | Experimental |
-| External trigger (JSS / CronJob) | Yes | Yes | Managed by the scheduler | No | GA |
+| Engine | Cross-instance single-winner | Persistent across restarts | Retry + dead-letter | Requires outbox table |
+|---|---|---|---|---|
+| `spawn` (default) | No — each instance fires | No | No | No |
+| `queued` (opt-in) | Yes | Yes | Yes | Yes |
+| External trigger (JSS / CronJob) | Yes | Yes | Managed by the scheduler | No |
 
 If you only run a single app instance and tolerate best-effort scheduling, `spawn` is fine. If you run more than one instance and want predictable cadence, pick `queued` or an external trigger.
 

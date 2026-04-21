@@ -1,0 +1,48 @@
+{
+  "name": "cds-data-pipeline",
+  "version": "0.1.0",
+  "description": "A CAP application-layer plugin for declarative, traceable, scheduled data pipelines between CAP services. Each pipeline is a linear READ -> MAP -> WRITE job between exactly one source and one target, with built-in tracker, retry, concurrency guard, management OData API, and event hooks.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikezaschka/cds-data-pipeline.git"
+  },
+  "keywords": [
+    "sap",
+    "cap",
+    "cds",
+    "pipeline",
+    "replication",
+    "data-integration"
+  ],
+  "author": "Mike Zaschka <opensource@mikezaschka.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mikezaschka/cds-data-pipeline/issues"
+  },
+  "homepage": "https://github.com/mikezaschka/cds-data-pipeline#readme",
+  "main": "cds-plugin.js",
+  "files": [
+    "srv/**",
+    "db/**",
+    "scripts/**",
+    "cds-plugin.js",
+    "README.md"
+  ],
+  "scripts": {
+    "docs:serve": "docker run --rm -it -p 8000:8000 -v \"$PWD:/docs\" squidfunk/mkdocs-material:9.5.44",
+    "docs:build": "docker run --rm -v \"$PWD:/docs\" squidfunk/mkdocs-material:9.5.44 build --clean --strict",
+    "docs:clean": "rm -rf site"
+  },
+  "cds": {
+    "folders": {
+      "db": "db",
+      "srv": "srv"
+    }
+  },
+  "peerDependencies": {
+    "@sap/cds": ">=9.2.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

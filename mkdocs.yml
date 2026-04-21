@@ -1,0 +1,109 @@
+site_name: cds-data-pipeline
+site_description: CAP application-layer data pipeline engine — scheduled READ → MAP → WRITE between services, with tracker, retry, management API, and event hooks.
+site_url: https://mikezaschka.github.io/cds-data-pipeline/
+repo_url: https://github.com/mikezaschka/cds-data-pipeline
+repo_name: mikezaschka/cds-data-pipeline
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Concepts:
+      - concepts/index.md
+      - Terminology: concepts/terminology.md
+      - Inference rules: concepts/inference.md
+      - Consumption views: concepts/consumption-views.md
+  - Sources:
+      - sources/index.md
+      - OData V2 / V4: sources/odata.md
+      - REST: sources/rest.md
+      - CQN: sources/cqn.md
+      - Custom source adapter: sources/custom.md
+  - Targets:
+      - targets/index.md
+      - Local DB: targets/db.md
+      - OData: targets/odata.md
+      - Custom target adapter: targets/custom.md
+  - Recipes:
+      - recipes/index.md
+      - Built-in replicate: recipes/built-in-replicate.md
+      - Built-in materialize: recipes/built-in-materialize.md
+      - Multi-source fan-in: recipes/multi-source.md
+      - Custom source adapter: recipes/custom-source-adapter.md
+      - Custom target adapter: recipes/custom-target-adapter.md
+      - Write-hook override: recipes/write-hook-override.md
+      - External scheduling (JSS): recipes/external-scheduling-jss.md
+      - Internal scheduling (queued): recipes/internal-scheduling-queued.md
+  - Reference:
+      - Features: reference/features.md
+      - Management Service: reference/management-service.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      # Pygments has no native CDS lexer. Aliasing ```cds fences to the
+      # TypeScript lexer gives decorators, the `as` keyword, strings, and
+      # comments reasonable coloring.
+      extend_pygments_lang:
+        - name: cds
+          lang: typescript
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mikezaschka/cds-data-pipeline
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/cds-data-pipeline

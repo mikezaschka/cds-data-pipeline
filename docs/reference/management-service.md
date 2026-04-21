@@ -178,12 +178,12 @@ const cds = require('@sap/cds');
 const pipelines = await cds.connect.to('DataPipelineService');
 
 // Filter records before MAP (before hooks receive the request only)
-pipelines.before('PIPELINE.MAP', 'ReplicatedPartners', async (req) => {
+pipelines.before('PIPELINE.MAP_BATCH', 'ReplicatedPartners', async (req) => {
     req.data.sourceRecords = req.data.sourceRecords.filter(r => !r.blocked);
 });
 
 // Custom MAP default — overrides the built-in rename mapping
-pipelines.on('PIPELINE.MAP', 'ReplicatedPartners', async (req) => {
+pipelines.on('PIPELINE.MAP_BATCH', 'ReplicatedPartners', async (req) => {
     req.data.targetRecords = req.data.sourceRecords.map(record => ({
         ID: record.BusinessPartner,
         name: record.BusinessPartnerFullName,
@@ -192,7 +192,7 @@ pipelines.on('PIPELINE.MAP', 'ReplicatedPartners', async (req) => {
 });
 
 // Enrich after MAP (after hooks receive `(results, req)` per CAP convention)
-pipelines.after('PIPELINE.MAP', 'ReplicatedPartners', async (_results, req) => {
+pipelines.after('PIPELINE.MAP_BATCH', 'ReplicatedPartners', async (_results, req) => {
     req.data.targetRecords = req.data.targetRecords.map(r => ({
         ...r,
         classification: classify(r),
@@ -209,21 +209,51 @@ await pipelines.addPipeline({
     delta: { field: 'modifiedAt', mode: 'timestamp' },
 });
 
-// Run on demand
-await pipelines.run('BusinessPartners');
+// Run synchronously (blocks until the run finishes).
+await pipelines.execute('BusinessPartners');
+
+// Run asynchronously in-process — returns immediately with `{ runId, name, done }`.
+const { runId, done } = await pipelines.execute('BusinessPartners', { async: true });
+done.then(({ status, statistics }) => console.log(runId, status, statistics));
+
+// Enqueue through the CAP persistent task queue — single-winner across
+// app instances. No `done` because the run may execute on another instance;
+// subscribe via `after('PIPELINE.DONE', ...)` for completion notifications.
+await pipelines.execute('BusinessPartners', { async: true, engine: 'queued' });
 ```
+
+### `execute` signature
+
+```javascript
+pipelines.execute(name, {
+    mode,      // 'full' | 'delta' | 'partial-refresh'  — defaults from pipeline config
+    trigger,   // 'manual' | 'scheduled' | 'external' | 'event'  (default 'manual')
+    async,     // boolean — fire-and-forget when true (default false)
+    engine,    // 'spawn' | 'queued' — only honored when async: true (default 'spawn')
+});
+```
+
+Return envelope in all modes:
+
+| Field | Type | When present |
+|---|---|---|
+| `runId` | `string` | Always. Correlates with `PipelineRuns.ID` and every `req.data.runId` in pipeline events. |
+| `name` | `string` | Always. |
+| `done` | `Promise<{ status, statistics }>` | Omitted only for `async: true, engine: 'queued'`. For sync calls `done` is already resolved; for async-spawn calls it's pending. Rejects on failure. Unobserved async rejections are also logged at error level. |
 
 ### Event hooks
 
-Pipelines emit three events per run:
+Five events fire per run:
 
 | Event | Fires | `req.data` contains |
 |---|---|---|
-| `PIPELINE.READ` | Once per run, before batch iteration | `config`, `source`, `target` → handler sets `sourceStream` (async iterable) |
-| `PIPELINE.MAP` | Once per batch | `sourceRecords`, `targetRecords` (handler fills `targetRecords`) |
-| `PIPELINE.WRITE` | Once per batch, after MAP | `targetRecords` (handler writes and sets `statistics`) |
+| `PIPELINE.START` | Once per run, before READ | `runId`, `mode`, `trigger`, `config`, `tracker` |
+| `PIPELINE.READ` | Once per run, before batch iteration | `runId`, `config`, `source`, `target` → handler sets `sourceStream` (async iterable) |
+| `PIPELINE.MAP_BATCH` | Once per batch | `runId`, `batchIndex`, `sourceRecords`, `targetRecords` (handler fills `targetRecords`) |
+| `PIPELINE.WRITE_BATCH` | Once per batch, after MAP_BATCH | `runId`, `batchIndex`, `targetRecords` (handler writes and sets `statistics`) |
+| `PIPELINE.DONE` | Once per run, success or failure | `runId`, `status` (`'completed'` / `'failed'`), `mode`, `trigger`, `startTime`, `endTime`, `statistics`, `error?` |
 
-Hooks register via the standard CAP API: `srv.before/on/after(event, pipelineName, handler)`.
+Hooks register via the standard CAP API: `srv.before/on/after(event, pipelineName, handler)`. `PIPELINE.START` and `PIPELINE.DONE` have no built-in default handler — use `on` / `before` / `after` freely. `after('PIPELINE.DONE', name, handler)` is the canonical hook for end-of-run notifications and works uniformly for sync, async-spawn, async-queued, and scheduled runs.
 
 !!! note "Signature convention"
     Per CAP convention: `before` and `on` hooks receive `(req)`; `after` hooks receive `(results, req)`. For non-READ events `results` is usually `undefined`, so `after` hooks should read and mutate state on the second argument (`req.data`).

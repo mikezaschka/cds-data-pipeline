@@ -9,7 +9,7 @@
 ## What this is
 
 - A programmatic `addPipeline({ name, source, target, mode, delta, schedule, ... })` API that registers one pipeline per call. Behaviour is [inferred from the config shape](https://mikezaschka.github.io/cds-data-pipeline/concepts/inference/).
-- A `cds.Service` (`DataPipelineService`) routing `PIPELINE.READ` → `PIPELINE.MAP` → `PIPELINE.WRITE` events, with hook registration via the standard `srv.before / on / after(event, pipelineName, handler)` API.
+- A `cds.Service` (`DataPipelineService`) routing `PIPELINE.START` → `PIPELINE.READ` → (`PIPELINE.MAP_BATCH` → `PIPELINE.WRITE_BATCH`)\* → `PIPELINE.DONE` events, with hook registration via the standard `srv.before / on / after(event, pipelineName, handler)` API.
 - A persisted tracker (`Pipelines`, `PipelineRuns`) + [management OData service](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/) at `/pipeline` (`DataPipelineManagementService`).
 - Source adapters: [OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/sources/odata/), [REST](https://mikezaschka.github.io/cds-data-pipeline/sources/rest/) (offset / cursor / page pagination), [CQN](https://mikezaschka.github.io/cds-data-pipeline/sources/cqn/) (in-process CAP services and CQN-native DB bindings), pluggable [`BaseSourceAdapter`](https://mikezaschka.github.io/cds-data-pipeline/sources/custom/).
 - Target adapters: [`DbTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/db/) (local DB) and [`ODataTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/odata/) (remote OData V2 / V4 via CAP's connected service) shipped in-box; pluggable [`BaseTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/custom/) for everything else.
@@ -43,7 +43,7 @@ A teaser of what the plugin offers. Full catalogue on the [Features reference pa
 - **Target adapters** — [local DB](https://mikezaschka.github.io/cds-data-pipeline/targets/db/) (default), [remote OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/targets/odata/), and a pluggable [`BaseTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/custom/) for non-db / non-OData destinations.
 - **Delta modes** — polling-based `timestamp` / `key` / `datetime-fields` for entity-shape reads; `full` and `partial-refresh` for query-shape. See [Inference rules](https://mikezaschka.github.io/cds-data-pipeline/concepts/inference/).
 - **Consumption views** — declare the target as a `projection on <remote.Entity>` annotated with `@cds.persistence.table`. One CDS declaration defines schema, column restriction, rename mapping, and filter. See [Consumption views](https://mikezaschka.github.io/cds-data-pipeline/concepts/consumption-views/).
-- **Event hooks** — `PIPELINE.READ` / `PIPELINE.MAP` / `PIPELINE.WRITE` via CAP's native `before / on / after` API. See [Event hooks](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/#event-hooks).
+- **Event hooks** — lifecycle events `PIPELINE.START` / `PIPELINE.DONE` bracket each run; `PIPELINE.READ` / `PIPELINE.MAP_BATCH` / `PIPELINE.WRITE_BATCH` drive the phases. Via CAP's native `before / on / after` API. See [Event hooks](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/#event-hooks).
 - **Scheduling** — in-process `spawn`, cross-instance persistent [`queued` engine](https://mikezaschka.github.io/cds-data-pipeline/recipes/internal-scheduling-queued/), or external drive via [SAP BTP Job Scheduling Service](https://mikezaschka.github.io/cds-data-pipeline/recipes/external-scheduling-jss/) / Kubernetes `CronJob`.
 - **Management OData service** — [`Pipelines`, `PipelineRuns`, `run` / `flush` / `status`](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/) actions at `/pipeline`.
 - **Observability** — per-pipeline tracker, per-run history, `created` / `updated` / `deleted` / `skipped` statistics, optional request-level snapshots. See [Features → Observability](https://mikezaschka.github.io/cds-data-pipeline/reference/features/#observability).
@@ -88,12 +88,16 @@ await pipelines.addPipeline({
 });
 
 // Hooks use CAP's standard pattern.
-pipelines.before('PIPELINE.MAP', 'BusinessPartners', async (req) => {
+pipelines.before('PIPELINE.MAP_BATCH', 'BusinessPartners', async (req) => {
     req.data.sourceRecords = req.data.sourceRecords.filter(r => !r.blocked);
 });
 
-// Run on demand
-await pipelines.run('BusinessPartners');
+// Run on demand — blocking
+await pipelines.execute('BusinessPartners');
+
+// Or fire-and-forget; `done` resolves when the run finishes
+const { runId, done } = await pipelines.execute('BusinessPartners', { async: true });
+done.then(({ status, statistics }) => console.log(runId, status, statistics));
 ```
 
 Full event-hook surface (signatures, ordering, `req.data` payload per phase) is on the [Management Service reference page](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/#event-hooks).

@@ -81,7 +81,20 @@ Independently, every pipeline run produces a `PipelineRuns` row via the usual tr
 - `GET /pipeline/PipelineRuns?$filter=status eq 'failed'&$orderby=startTime desc` — the pipeline-level view. Each scheduled attempt shows `trigger='scheduled'`.
 - A dead-letter queue inspection service over `cds.outbox.Messages` — the scheduling-level view. Useful if the pipeline itself never ran (e.g. the service couldn't be connected). See the CAP docs on [Managing the Dead Letter Queue](https://cap.cloud.sap/docs/node.js/queue#managing-the-dead-letter-queue).
 
-## 5. Coexistence
+## 5. Ad-hoc queued runs
+
+The same queued engine is available for one-off runs through the programmatic API, without registering a `schedule`:
+
+```javascript
+const pipelines = await cds.connect.to('DataPipelineService');
+await pipelines.execute('BusinessPartners', { async: true, engine: 'queued' });
+```
+
+Semantics mirror the scheduled path — the run is enqueued via `cds.queued(srv).emit('PIPELINE.TICK', ...)` and dispatched by a single app instance. Useful when you want cross-instance single-winner semantics for a manually triggered run (e.g. a BTP JSS-fired OData action that must not double-fire across replicas).
+
+The returned envelope omits `done` because the run may execute on another instance — there's no in-process completion signal. Subscribe via `after('PIPELINE.DONE', name, ...)` for notifications, or poll `PipelineRuns` for the terminal state.
+
+## 6. Coexistence
 
 - **Mixing engines per pipeline is allowed.** One pipeline can use `engine: 'spawn'`, another `engine: 'queued'`, and a third can be externally triggered (no `schedule`).
 - **Don't mix internal and external on the same pipeline.** Setting `schedule` on a pipeline that an external scheduler also calls results in double-firing. The concurrency guard prevents duplicate work but wastes resources.

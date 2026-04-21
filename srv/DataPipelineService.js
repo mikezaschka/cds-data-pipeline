@@ -3,7 +3,13 @@ const Pipeline = require('./lib/Pipeline')
 
 const LOG = cds.log('cds-data-pipeline')
 
-const PIPELINE_EVENTS = ['PIPELINE.READ', 'PIPELINE.MAP', 'PIPELINE.WRITE']
+const PIPELINE_EVENTS = [
+    'PIPELINE.START',
+    'PIPELINE.READ',
+    'PIPELINE.MAP_BATCH',
+    'PIPELINE.WRITE_BATCH',
+    'PIPELINE.DONE',
+]
 
 const VALID_SOURCE_KINDS = new Set(['cqn', 'odata', 'odata-v2', 'rest'])
 
@@ -20,10 +26,15 @@ const DOC_REF_FAN_IN = `See https://mikezaschka.github.io/cds-data-pipeline/reci
 /**
  * CDS service that orchestrates configured pipelines.
  *
- * Extends `cds.Service` so the READ -> MAP -> WRITE pipeline runs through
- * CAP's native event dispatch. The pipeline uses namespaced events
- * (`PIPELINE.READ`, `PIPELINE.MAP`, `PIPELINE.WRITE`) to avoid collision
- * with CAP's CRUD aliases (`READ`, `WRITE` -> CREATE+UPSERT+UPDATE).
+ * Extends `cds.Service` so the pipeline runs through CAP's native event
+ * dispatch. Five namespaced events bracket each run (prefix avoids
+ * collision with CAP's CRUD aliases `READ` / `WRITE`):
+ *
+ *   PIPELINE.START       — once per run, before READ
+ *   PIPELINE.READ        — once per run, stream setup
+ *   PIPELINE.MAP_BATCH   — per batch
+ *   PIPELINE.WRITE_BATCH — per batch, after MAP_BATCH
+ *   PIPELINE.DONE        — once per run, success or failure
  *
  * Defaults per pipeline are stored in internal maps and invoked from a
  * single service-level `on()` router. User hooks registered via the standard
@@ -47,6 +58,22 @@ class DataPipelineService extends cds.Service {
         for (const event of PIPELINE_EVENTS) {
             this.on(event, (req, next) => this._route(event, req, next))
         }
+
+        // Shared PIPELINE.TICK handler for the queued engine. Registered
+        // unconditionally so ad-hoc `execute({ async: true, engine: 'queued' })`
+        // works whether or not any pipeline carries a queued schedule. The
+        // scheduled-schedule path (`_scheduleQueued`) reuses this handler
+        // via `cds.queued(this).schedule('PIPELINE.TICK', { name })`.
+        this.on('PIPELINE.TICK', async (req) => {
+            const { name, mode = 'delta', trigger = 'scheduled', runId } = req.data || {}
+            if (!name) return
+            const pipeline = this.pipelines.get(name)
+            if (!pipeline) {
+                LOG.warn(`PIPELINE.TICK received for unknown pipeline '${name}'`)
+                return
+            }
+            await pipeline._run(mode, trigger, runId)
+        })
 
         await super.init()
     }
@@ -120,24 +147,71 @@ class DataPipelineService extends cds.Service {
     }
 
     /**
-     * Public API:  `srv.run(name, mode?, trigger?)` — triggers a pipeline run.
-     * Framework:   `srv.run(fn)` / `srv.run(query)` — CAP's transactional
-     *              wrapper; delegates to the base class so `srv.dispatch()`
-     *              continues to work.
+     * Execute a pipeline. Uniform envelope return in all modes.
+     *
+     *   @param {string} name
+     *   @param {object} [opts]
+     *   @param {'full'|'delta'|'partial-refresh'} [opts.mode='delta']
+     *   @param {'manual'|'scheduled'|'external'|'event'} [opts.trigger='manual']
+     *   @param {boolean} [opts.async=false]   true = fire-and-forget, false = block
+     *   @param {'spawn'|'queued'} [opts.engine='spawn']  only honored when async=true
+     *   @returns {Promise<{ runId: string, name: string, done?: Promise }>}
+     *
+     * Behavior:
+     *   - async=false: awaits the run; resolves with `done` already settled
+     *     to `{ status, statistics }`. Failures throw.
+     *   - async=true, engine='spawn': resolves immediately; `done` is a
+     *     pending Promise that resolves to `{ status, statistics }` on
+     *     success or rejects on failure. Unhandled rejections are also
+     *     logged via cds.log.
+     *   - async=true, engine='queued': resolves after the enqueue; `done`
+     *     is omitted (the run may execute on another instance). Use
+     *     `after('PIPELINE.DONE', name, ...)` for notifications.
      */
-    run(first, mode = 'delta', trigger = 'manual') {
-        if (typeof first === 'string') {
-            return this._runPipeline(first, mode, trigger)
-        }
-        return super.run(...arguments)
-    }
-
-    async _runPipeline(name, mode, trigger) {
+    async execute(name, { mode = 'delta', trigger = 'manual', async: isAsync = false, engine = 'spawn' } = {}) {
         const pipeline = this.pipelines.get(name)
         if (!pipeline) {
             throw new Error(`Unknown pipeline: ${name}`)
         }
-        await pipeline.execute(mode, trigger)
+
+        const runId = cds.utils.uuid()
+
+        if (!isAsync) {
+            const result = await pipeline._run(mode, trigger, runId)
+            return { runId, name, done: Promise.resolve(result) }
+        }
+
+        if (engine === 'queued') {
+            if (typeof cds.queued !== 'function') {
+                throw new Error(
+                    `execute: async with engine='queued' requires a CAP runtime that exposes ` +
+                    `cds.queued(srv). Update @sap/cds, or use async:true with engine:'spawn' ` +
+                    `(default), or omit async for a blocking run.`
+                )
+            }
+            const queued = cds.queued(this)
+            if (!queued || typeof queued.emit !== 'function') {
+                throw new Error(
+                    `execute: cds.queued(srv).emit(...) is not available on this CAP runtime. ` +
+                    `Fall back to engine:'spawn' or a blocking call.`
+                )
+            }
+            await queued.emit('PIPELINE.TICK', { name, mode, trigger, runId })
+            return { runId, name }
+        }
+
+        // engine === 'spawn' (default async path)
+        let resolve, reject
+        const done = new Promise((res, rej) => { resolve = res; reject = rej })
+        cds.spawn(async () => {
+            try {
+                resolve(await pipeline._run(mode, trigger, runId))
+            } catch (err) {
+                LOG._error && LOG.error(`Async pipeline '${name}' failed:`, err)
+                reject(err)
+            }
+        })
+        return { runId, name, done }
     }
 
     async getStatus(name) {
@@ -200,9 +274,10 @@ class DataPipelineService extends cds.Service {
             LOG.warn(`Invalid schedule for '${name}': ${every}`)
             return
         }
+        const pipeline = this.pipelines.get(name)
         cds.spawn({ every: interval }, async () => {
             try {
-                await this.run(name, 'delta', 'scheduled')
+                await pipeline._run('delta', 'scheduled')
             } catch (err) {
                 LOG._error && LOG.error(`Scheduled pipeline failed for ${name}:`, err)
             }
@@ -219,18 +294,9 @@ class DataPipelineService extends cds.Service {
             )
         }
 
-        // Register the shared PIPELINE.TICK handler exactly once. It
-        // receives the pipeline name via the scheduled message payload
-        // and forwards into the normal run path.
-        if (!this._queuedTickHandlerRegistered) {
-            this.on('PIPELINE.TICK', async (req) => {
-                const target = req.data && req.data.name
-                if (!target) return
-                await this.run(target, 'delta', 'scheduled')
-            })
-            this._queuedTickHandlerRegistered = true
-        }
-
+        // The shared PIPELINE.TICK handler is registered in `init()` so
+        // both scheduled and ad-hoc queued execution share one dispatch
+        // path. Here we only enqueue the recurring schedule message.
         const queued = cds.queued(this)
         if (!queued || typeof queued.schedule !== 'function') {
             throw new Error(

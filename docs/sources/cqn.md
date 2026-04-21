@@ -31,7 +31,7 @@ await pipelines.addPipeline({
     delta: { mode: 'timestamp', field: 'modifiedAt' },
 });
 
-await pipelines.run('ArchivedOrders');
+await pipelines.execute('ArchivedOrders');
 ```
 
 The presence of `source.entity` (and absence of `source.query`) marks this as an entity-shape pipeline. See [Inference rules → Read shape](../concepts/inference.md#read-shape). The CQN adapter is selected automatically when the service declared in `cds.requires` has a CQN-native `kind` (`postgres`, `hana`, `sqlite`, `better-sqlite`, in-process CAP services, …), or explicitly via `source.kind: 'cqn'`.

@@ -9,11 +9,13 @@ const RUNS = 'plugin_data_pipeline_PipelineRuns'
 /**
  * Per-pipeline execution engine.
  *
- * Drives the READ -> MAP -> WRITE pipeline by constructing `cds.Request`
- * instances and dispatching them through the parent `DataPipelineService`.
- * Default per-phase handlers are registered on the parent service and invoked
- * via its internal router; user-facing hooks (`before.PIPELINE.MAP`,
- * `after.PIPELINE.WRITE`, ...) compose through CAP's native handler chain.
+ * Drives the pipeline by constructing `cds.Request` instances and
+ * dispatching them through the parent `DataPipelineService`. Five events
+ * bracket each run: `PIPELINE.START`, `PIPELINE.READ`, `PIPELINE.MAP_BATCH`,
+ * `PIPELINE.WRITE_BATCH`, `PIPELINE.DONE`. Default per-phase handlers for
+ * READ / MAP_BATCH / WRITE_BATCH are registered on the parent service and
+ * invoked via its internal router; user-facing hooks (`before.PIPELINE.MAP_BATCH`,
+ * `after.PIPELINE.DONE`, ...) compose through CAP's native handler chain.
  */
 class Pipeline {
     constructor(name, config, srv) {
@@ -24,8 +26,8 @@ class Pipeline {
 
     async init() {
         this.srv.registerDefault('PIPELINE.READ', this.name, (req) => this._defaultReadHandler(req))
-        this.srv.registerDefault('PIPELINE.MAP', this.name, (req) => this._defaultMapHandler(req))
-        this.srv.registerDefault('PIPELINE.WRITE', this.name, (req) => this._defaultWriteHandler(req))
+        this.srv.registerDefault('PIPELINE.MAP_BATCH', this.name, (req) => this._defaultMapHandler(req))
+        this.srv.registerDefault('PIPELINE.WRITE_BATCH', this.name, (req) => this._defaultWriteHandler(req))
 
         // Resolve the read adapter once at registration. Lets the service
         // compose an adapter-aware startup log line (ADR 0007
@@ -79,23 +81,38 @@ class Pipeline {
 
     // ─── Execution ──────────────────────────────────────────────────────────────
 
-    async execute(mode = 'delta', trigger = 'manual') {
+    /**
+     * Execute the pipeline. Internal entry point — public callers use
+     * `DataPipelineService#execute(name, opts?)`, which mints the runId
+     * and threads it into here.
+     *
+     *   @param {string} [mode='delta']
+     *   @param {string} [trigger='manual']
+     *   @param {string} [runId]   caller-supplied correlation id; minted
+     *                             here if omitted so scheduler / TICK
+     *                             callers work unchanged.
+     *   @returns {Promise<{ runId, status, statistics }>}
+     */
+    async _run(mode = 'delta', trigger = 'manual', runId) {
         const affected = await UPDATE(PIPELINES)
             .set({ status: 'running' })
             .where({ name: this.name, status: { '!=': 'running' } })
 
         if (affected === 0) {
             LOG.warn(`Pipeline '${this.name}' already running, skipping.`)
-            return
+            return { runId, status: 'skipped', statistics: { created: 0, updated: 0, deleted: 0 } }
         }
 
-        const runId = cds.utils.uuid()
+        const effectiveRunId = runId || cds.utils.uuid()
+        this.currentRunId = effectiveRunId
+        const startTime = new Date().toISOString()
+        let tracker
         try {
             await INSERT.into(RUNS).entries({
-                ID: runId,
+                ID: effectiveRunId,
                 pipeline_name: this.name,
                 status: 'running',
-                startTime: new Date().toISOString(),
+                startTime,
                 trigger,
                 mode,
                 origin: this.origin || null,
@@ -104,44 +121,106 @@ class Pipeline {
                 statistics_deleted: 0,
             })
 
+            tracker = await this._getTracker()
+
+            // ── PIPELINE.START ──
+            await this._dispatchLifecycle('PIPELINE.START', {
+                runId: effectiveRunId,
+                mode,
+                trigger,
+                config: this.config,
+                tracker,
+            })
+
             const stats = mode === 'full'
                 ? await this._fullSync()
                 : await this._deltaSync()
 
+            const endTime = new Date().toISOString()
+
             await UPDATE(RUNS).set({
                 status: 'completed',
-                endTime: new Date().toISOString(),
+                endTime,
                 statistics_created: stats.created,
                 statistics_updated: stats.updated,
                 statistics_deleted: stats.deleted,
-            }).where({ ID: runId })
+            }).where({ ID: effectiveRunId })
 
             await UPDATE(PIPELINES).set({
                 status: 'idle',
-                lastSync: new Date().toISOString(),
+                lastSync: endTime,
                 statistics_created: { '+=': stats.created },
                 statistics_updated: { '+=': stats.updated },
                 statistics_deleted: { '+=': stats.deleted },
             }).where({ name: this.name })
 
+            // ── PIPELINE.DONE (success) ──
+            await this._dispatchLifecycle('PIPELINE.DONE', {
+                runId: effectiveRunId,
+                status: 'completed',
+                mode,
+                trigger,
+                startTime,
+                endTime,
+                statistics: stats,
+            })
+
+            return { runId: effectiveRunId, status: 'completed', statistics: stats }
+
         } catch (err) {
             LOG._error && LOG.error(`Pipeline failed for ${this.name}:`, err)
 
-            if (runId) {
+            const endTime = new Date().toISOString()
+            const zeroStats = { created: 0, updated: 0, deleted: 0 }
+
+            try {
                 await UPDATE(RUNS).set({
                     status: 'failed',
-                    endTime: new Date().toISOString(),
+                    endTime,
                     error: JSON.stringify({ message: err.message }),
-                }).where({ ID: runId })
+                }).where({ ID: effectiveRunId })
+
+                await UPDATE(PIPELINES).set({
+                    status: 'failed',
+                    errorCount: { '+=': 1 },
+                    lastError: err.message,
+                }).where({ name: this.name })
+            } catch (trackerErr) {
+                LOG._error && LOG.error(`Failed to record failure for ${this.name}:`, trackerErr)
             }
 
-            await UPDATE(PIPELINES).set({
+            // ── PIPELINE.DONE (failure) — dispatched before re-throw so
+            // observers always see a completion signal. Dispatch errors
+            // must never mask the original pipeline error.
+            await this._dispatchLifecycle('PIPELINE.DONE', {
+                runId: effectiveRunId,
                 status: 'failed',
-                errorCount: { '+=': 1 },
-                lastError: err.message,
-            }).where({ name: this.name })
+                mode,
+                trigger,
+                startTime,
+                endTime,
+                statistics: zeroStats,
+                error: { message: err.message },
+            })
 
             throw err
+        } finally {
+            this.currentRunId = null
+        }
+    }
+
+    /**
+     * Dispatch a START / DONE lifecycle event through the parent service.
+     * Swallows and logs dispatch errors so a misbehaving observer can
+     * never mask the pipeline's own outcome (important on the failure
+     * branch of `_run`, where the real error must still surface).
+     */
+    async _dispatchLifecycle(event, data) {
+        try {
+            const req = this._makeReq(event, data)
+            await this.srv.dispatch(req)
+        } catch (err) {
+            LOG._error && LOG.error(`${event} handler for '${this.name}' failed:`, err)
         }
     }
 
@@ -233,8 +312,10 @@ class Pipeline {
                 await this._prepareMaterializeTarget()
             }
 
+            let batchIndex = 0
             for await (const batch of sourceStream) {
-                const mapReq = this._makeReq('PIPELINE.MAP', {
+                const mapReq = this._makeReq('PIPELINE.MAP_BATCH', {
+                    batchIndex,
                     config: this.config,
                     source: this.config.source,
                     target: this.config.target,
@@ -244,9 +325,13 @@ class Pipeline {
                 await this.srv.dispatch(mapReq)
 
                 const records = mapReq.data.targetRecords
-                if (!records || records.length === 0) continue
+                if (!records || records.length === 0) {
+                    batchIndex += 1
+                    continue
+                }
 
-                const writeReq = this._makeReq('PIPELINE.WRITE', {
+                const writeReq = this._makeReq('PIPELINE.WRITE_BATCH', {
+                    batchIndex,
                     config: this.config,
                     target: this.config.target,
                     targetRecords: records,
@@ -258,6 +343,7 @@ class Pipeline {
                 stats.created += s.created || 0
                 stats.updated += s.updated || 0
                 stats.deleted += s.deleted || 0
+                batchIndex += 1
             }
         }
 
@@ -312,13 +398,14 @@ class Pipeline {
      * `next()` fall-through). Path uses the plugin convention
      * `${srv.name}.${pipelineName}` so user-registered
      * `before/after(event, pipelineName, handler)` hooks match via CAP's
-     * native path matcher.
+     * native path matcher. `runId` is carried on every payload so consumers
+     * can correlate across START / READ / MAP_BATCH / WRITE_BATCH / DONE.
      */
     _makeReq(event, data) {
         const req = new cds.Request({
             event,
             path: `${this.srv.name}.${this.name}`,
-            data: { pipeline: this.name, ...data },
+            data: { pipeline: this.name, runId: this.currentRunId, ...data },
         })
         req.reply = (x) => { req.results = x }
         return req
@@ -364,7 +451,7 @@ class Pipeline {
         const target = req.data.target || config.target
 
         // ADR 0008 belt-and-braces: re-stamp `source = origin` right
-        // before WRITE so a consumer-supplied `on('PIPELINE.MAP')` that
+        // before WRITE so a consumer-supplied `on('PIPELINE.MAP_BATCH')` that
         // forgot the stamp still produces valid compound keys.
         this._stampOrigin(records)
 

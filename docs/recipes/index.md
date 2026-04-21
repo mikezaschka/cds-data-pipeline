@@ -14,7 +14,7 @@ Four ways to plug into `cds-data-pipeline`, ordered by how much code you write. 
 | **Custom source adapter** — source transport is not OData / REST / CQN | Reading from CSV, files, proprietary HTTP APIs, message buses, anything else. | [Custom source adapter](custom-source-adapter.md) |
 | **Custom target adapter** — target is not the local DB and not an OData service | Forwarding to reporting services, message buses, custom HTTP APIs. Reusable across pipelines. | [Custom target adapter](custom-target-adapter.md) |
 | **`PIPELINE.*` event hooks** — minimal-effort customization of any phase | Filter, enrich, normalize, forward, react to completion. `before` / `on` / `after` on `PIPELINE.START / READ / MAP_BATCH / WRITE_BATCH / DONE` in classic CAP style. | [Event hooks](event-hooks.md) |
-| **External scheduler (JSS / CronJob)** — drive pipelines from outside the CAP app | Centralized BTP-native cron, corporate scheduling policies, org-level run observability. Omit `schedule`; call `POST /pipeline/run`. | [External scheduling (JSS)](external-scheduling-jss.md) |
+| **External scheduler (JSS / CronJob)** — drive pipelines from outside the CAP app | Centralized BTP-native cron, corporate scheduling policies, org-level run observability. Omit `schedule`; call `POST /pipeline/execute`. | [External scheduling (JSS)](external-scheduling-jss.md) |
 | **In-process queued scheduler** — persistent schedule where only one app instance runs the tick | Scaled deployments (>1 app instance) that want persistence, retry, and cross-instance safety without an external service. `schedule: { every, engine: 'queued' }`. | [Internal scheduling (queued)](internal-scheduling-queued.md) |
 
 ## Decision tree

@@ -1,4 +1,4 @@
-const cds = require('@sap/cds')
+const cds = require('../runtime-cds')
 const { createAdapter } = require('../adapters/factory')
 const { createTargetAdapter } = require('../adapters/targets/factory')
 

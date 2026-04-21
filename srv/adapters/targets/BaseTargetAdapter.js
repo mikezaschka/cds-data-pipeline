@@ -1,4 +1,4 @@
-const cds = require('@sap/cds')
+const cds = require('../../runtime-cds')
 
 /**
  * Abstract target adapter. A target adapter is the protocol-specific

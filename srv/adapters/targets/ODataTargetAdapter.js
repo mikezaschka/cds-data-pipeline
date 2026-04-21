@@ -1,4 +1,4 @@
-const cds = require('@sap/cds')
+const cds = require('../../runtime-cds')
 const BaseTargetAdapter = require('./BaseTargetAdapter')
 const { withRetry } = require('../../lib/retry')
 
@@ -14,7 +14,9 @@ const { withRetry } = require('../../lib/retry')
  *
  * ## Operations
  *
- * - `writeBatch({ mode: 'upsert' })` → `UPSERT.into(target.entity).entries(records)`.
+ * - `writeBatch({ mode: 'upsert' })` → `INSERT.into(...)` on the remote service.
+ *   CAP's OData client does not translate `UPSERT` CQN to HTTP; use full refresh
+ *   or a custom adapter if you need true merge semantics against a remote entity.
  * - `writeBatch({ mode: 'snapshot' })` → `INSERT.into(target.entity).entries(records)`.
  * - `truncate(target)` → page `SELECT` of keys, then one DELETE per row.
  * - `deleteSlice(target, predicate)` → page `SELECT` of keys matching
@@ -60,6 +62,33 @@ class ODataTargetAdapter extends BaseTargetAdapter {
         }
     }
 
+    /**
+     * Remote OData services expect CQN entity refs relative to the service
+     * (e.g. MirroredCustomers), while the composed model uses fully qualified
+     * names (InventoryService.MirroredCustomers) for definitions lookup.
+     */
+    _entityForRemoteCqn(entity) {
+        if (!entity || typeof entity !== 'string') return entity
+        const svc = this.service && this.service.name
+        if (svc) {
+            const prefix = `${svc}.`
+            if (entity.startsWith(prefix)) return entity.slice(prefix.length)
+        }
+        const dot = entity.lastIndexOf('.')
+        return dot === -1 ? entity : entity.slice(dot + 1)
+    }
+
+    /** Drop navigation properties and unknown fields so OData POST payloads match the entity shape. */
+    _rowForTargetEntity(row, entityFqn) {
+        const def = cds.model && cds.model.definitions && cds.model.definitions[entityFqn]
+        if (!def || !def.elements) return { ...row }
+        const out = {}
+        for (const k of Object.keys(row)) {
+            if (def.elements[k] && !def.elements[k].target) out[k] = row[k]
+        }
+        return out
+    }
+
     _resolveKeyColumns(entity) {
         const t = (this.config && this.config.target) || {}
         if (Array.isArray(t.keyColumns) && t.keyColumns.length > 0) {
@@ -96,17 +125,14 @@ class ODataTargetAdapter extends BaseTargetAdapter {
         if (!entity) {
             throw new Error(`ODataTargetAdapter.writeBatch: target.entity is required`)
         }
+        const into = this._entityForRemoteCqn(entity)
 
         const retryOpts = this._retryOptions()
 
-        if (mode === 'snapshot') {
+        for (const row of records) {
+            const payload = this._rowForTargetEntity(row, entity)
             await withRetry(
-                () => this.service.run(INSERT.into(entity).entries(records)),
-                retryOpts
-            )
-        } else {
-            await withRetry(
-                () => this.service.run(UPSERT.into(entity).entries(records)),
+                () => this.service.run(INSERT.into(into).entries(payload)),
                 retryOpts
             )
         }
@@ -123,6 +149,7 @@ class ODataTargetAdapter extends BaseTargetAdapter {
         if (!entity) {
             throw new Error(`ODataTargetAdapter._sweep: target.entity is required`)
         }
+        const from = this._entityForRemoteCqn(entity)
         const keyColumns = this._resolveKeyColumns(entity)
         const batchSize = (this.config && this.config.target && this.config.target.batchSize) || 1000
         const retryOpts = this._retryOptions()
@@ -136,7 +163,7 @@ class ODataTargetAdapter extends BaseTargetAdapter {
         let hasMore = true
 
         while (hasMore) {
-            let query = SELECT.from(entity).columns(...keyColumns).limit(batchSize, 0)
+            let query = SELECT.from(from).columns(...keyColumns).limit(batchSize, 0)
             if (hasPredicate) {
                 query = query.where(predicate)
             }
@@ -150,7 +177,7 @@ class ODataTargetAdapter extends BaseTargetAdapter {
             for (const row of page) {
                 const key = this._pickKey(row, keyColumns)
                 await withRetry(
-                    () => this.service.run(DELETE.from(entity).where(key)),
+                    () => this.service.run(DELETE.from(from).where(key)),
                     retryOpts
                 )
                 deleted++

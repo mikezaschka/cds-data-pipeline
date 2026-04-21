@@ -28,15 +28,38 @@
     "cds-plugin.js",
     "README.md"
   ],
+  "workspaces": [
+    "test/fixtures/consumer",
+    "test/fixtures/provider",
+    "test/fixtures/inventory-provider",
+    "test/fixtures/rest-provider"
+  ],
   "scripts": {
+    "pretest": "npm install --silent",
+    "test": "jest --runInBand",
+    "test:unit": "jest --runInBand test/unit",
+    "test:integration": "jest --runInBand test/integration",
     "docs:serve": "docker run --rm -it -p 8000:8000 -v \"$PWD:/docs\" squidfunk/mkdocs-material:9.5.44",
     "docs:build": "docker run --rm -v \"$PWD:/docs\" squidfunk/mkdocs-material:9.5.44 build --clean --strict",
     "docs:clean": "rm -rf site"
+  },
+  "devDependencies": {
+    "@cap-js/cds-test": "^0.4.1",
+    "@cap-js/mcp-server": "^0.0.4",
+    "@sap-ux/fiori-mcp-server": "^0.6.49",
+    "@sap/cds": "^9",
+    "@ui5/mcp-server": "^0.2.11",
+    "jest": "^29.7.0"
   },
   "cds": {
     "folders": {
       "db": "db",
       "srv": "srv"
+    },
+    "requires": {
+      "DataPipelineService": {
+        "impl": "cds-data-pipeline/srv/DataPipelineService.js"
+      }
     }
   },
   "peerDependencies": {

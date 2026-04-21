@@ -3,24 +3,77 @@ using { plugin.data_pipeline as pipeline } from '../db/index.cds';
 service DataPipelineManagementService @(path: '/pipeline') {
 
     @readonly
-    @(requires: 'authenticated-user')
-    entity Pipelines as projection on pipeline.Pipelines;
+    @cds.persistence.skip: true
+    @cds.odata.valuelist: true
+    entity PipelineRunModes {
+        key code : String;
+            name : String;
+    }
 
     @readonly
-    @(requires: 'authenticated-user')
+    @cds.persistence.skip: true
+    @cds.odata.valuelist: true
+    entity PipelineRunTriggers {
+        key code : String;
+            name : String;
+    }
+
+    @readonly
+    entity Pipelines as projection on pipeline.Pipelines actions {
+        action start(
+            @(Common: {
+                ValueListWithFixedValues : true,
+                ValueList                : {
+                    Label          : 'Mode',
+                    CollectionPath : 'PipelineRunModes',
+                    Parameters     : [
+                        {
+                            $Type             : 'Common.ValueListParameterInOut',
+                            ValueListProperty : 'code',
+                            LocalDataProperty : mode,
+                        },
+                        {
+                            $Type             : 'Common.ValueListParameterDisplayOnly',
+                            ValueListProperty : 'name',
+                        },
+                    ],
+                },
+            })
+            mode    : pipeline.ReplicationMode,
+            @(Common: {
+                ValueListWithFixedValues : true,
+                ValueList                : {
+                    Label          : 'Trigger',
+                    CollectionPath : 'PipelineRunTriggers',
+                    Parameters     : [
+                        {
+                            $Type             : 'Common.ValueListParameterInOut',
+                            ValueListProperty : 'code',
+                            LocalDataProperty : trigger,
+                        },
+                        {
+                            $Type             : 'Common.ValueListParameterDisplayOnly',
+                            ValueListProperty : 'name',
+                        },
+                    ],
+                },
+            })
+            trigger : pipeline.RunTrigger,
+            async   : Boolean
+        ) returns String;
+    }
+
+    @readonly
     entity PipelineRuns as projection on pipeline.PipelineRuns;
 
-    @(requires: 'PipelineRunner')
-    action run(
+    action execute(
         name    : String,
         mode    : String,
         trigger : String,
         async   : Boolean
     ) returns String;
 
-    @(requires: 'PipelineRunner')
     action flush(name : String) returns String;
 
-    @(requires: 'authenticated-user')
     function status(name : String) returns Pipelines;
 }

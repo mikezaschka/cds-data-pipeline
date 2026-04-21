@@ -45,7 +45,7 @@ A teaser of what the plugin offers. Full catalogue on the [Features reference pa
 - **Consumption views** — declare the target as a `projection on <remote.Entity>` annotated with `@cds.persistence.table`. One CDS declaration defines schema, column restriction, rename mapping, and filter. See [Consumption views](https://mikezaschka.github.io/cds-data-pipeline/concepts/consumption-views/).
 - **Event hooks** — lifecycle events `PIPELINE.START` / `PIPELINE.DONE` bracket each run; `PIPELINE.READ` / `PIPELINE.MAP_BATCH` / `PIPELINE.WRITE_BATCH` drive the phases. Via CAP's native `before / on / after` API. See [Event hooks](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/#event-hooks).
 - **Scheduling** — in-process `spawn`, cross-instance persistent [`queued` engine](https://mikezaschka.github.io/cds-data-pipeline/recipes/internal-scheduling-queued/), or external drive via [SAP BTP Job Scheduling Service](https://mikezaschka.github.io/cds-data-pipeline/recipes/external-scheduling-jss/) / Kubernetes `CronJob`.
-- **Management OData service** — [`Pipelines`, `PipelineRuns`, `run` / `flush` / `status`](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/) actions at `/pipeline`.
+- **Management OData service** — [`Pipelines`, `PipelineRuns`, `execute`, bound `start`, `flush`, `status`](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/) at `/pipeline`.
 - **Observability** — per-pipeline tracker, per-run history, `created` / `updated` / `deleted` / `skipped` statistics, optional request-level snapshots. See [Features → Observability](https://mikezaschka.github.io/cds-data-pipeline/reference/features/#observability).
 - **Resilience** — retry with exponential backoff, concurrency guard, and per-batch or per-run transaction scope.
 - **Plugin entry points** — four extension points, ordered by how much code you write: built-in adapters (no code), [custom source adapter](https://mikezaschka.github.io/cds-data-pipeline/recipes/custom-source-adapter/), [custom target adapter](https://mikezaschka.github.io/cds-data-pipeline/recipes/custom-target-adapter/), [`PIPELINE.*` event hooks](https://mikezaschka.github.io/cds-data-pipeline/recipes/event-hooks/).
@@ -68,6 +68,25 @@ The plugin ships CDS for the `Pipelines` / `PipelineRuns` tracker tables under n
 
 - **Local / SQLite** — run `cds deploy` (or let the CAP dev runtime bootstrap the schema from the bound profile).
 - **HANA HDI** — the HDI container owns the schema. Include the plugin's CDS model in your consumer build (`cds build --production`) and deploy via `cf push` or the HDI deployer. No runtime DDL is performed.
+
+## Tests (this repository)
+
+Integration and unit tests live under `test/`. The layout is:
+
+- `test/fixtures/consumer` — CAP consumer app (workspace package) with `register-fixture-pipelines.js` loaded when `CDS_PIPELINE_TEST_CONSUMER=true` (set by Jest `setupFiles`).
+- `test/fixtures/provider`, `inventory-provider`, `rest-provider` — sibling workspace packages that mock OData / REST backends.
+- `test/support` — Jest env bootstrap, provider spawn helpers, shared helpers (`waitForConsumerFixturePipelines`, …).
+- `test/unit`, `test/integration` — Jest suites.
+
+From the repo root (npm workspaces install deps once):
+
+```bash
+npm test              # all tests
+npm run test:unit     # unit only
+npm run test:integration
+```
+
+Consumers of the published package only need the usual `cds deploy` + `using from 'cds-data-pipeline/db'` (or equivalent) so tracker tables exist; the Jest-only env flag and `test/` tree are not shipped on npm.
 
 ## Programmatic API
 
@@ -108,15 +127,18 @@ OData service at `/pipeline` (`DataPipelineManagementService`) — full referenc
 
 - `GET /pipeline/Pipelines` — configuration + statistics per pipeline.
 - `GET /pipeline/PipelineRuns` — per-run timing, trigger, status, statistics.
-- `POST /pipeline/run` — `{ name, mode?, trigger?, async? }` — run a pipeline. Used by scripts, tests, and external schedulers (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...). Protected by the `PipelineRunner` scope.
+- `POST /pipeline/execute` — `{ name, mode?, trigger?, async? }` — run a pipeline. Used by scripts, tests, and external schedulers (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...).
+- `POST /pipeline/Pipelines('<name>')/DataPipelineManagementService.start` — same run as `execute`, bound to the `Pipelines` instance (typical for Fiori object-page actions). See the [management service reference](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/).
 - `POST /pipeline/flush` — `{ name }` — reset tracker + clear target output.
+
+Authorization for `/pipeline` is **not** defined by the plugin: add `@(requires: …)`, XSUAA, and routing rules in your own application.
 - `GET /pipeline/status(name='...')` — single tracker record.
 
 ## Scheduling
 
 Pick one of three drive models per pipeline (mix freely across pipelines in the same app):
 
-- **Omit `schedule`** and trigger externally via `POST /pipeline/run`. Recommended for BTP-native ops — see the [SAP BTP Job Scheduling Service recipe](https://mikezaschka.github.io/cds-data-pipeline/recipes/external-scheduling-jss/).
+- **Omit `schedule`** and trigger externally via `POST /pipeline/execute`. Recommended for BTP-native ops — see the [SAP BTP Job Scheduling Service recipe](https://mikezaschka.github.io/cds-data-pipeline/recipes/external-scheduling-jss/).
 - **`schedule: 600000`** (or `{ every, engine: 'spawn' }`) — in-process timer via `cds.spawn({ every })`. Best-effort, fires on every app instance. Good for dev and single-instance deployments.
 - **`schedule: { every: '10m', engine: 'queued' }`** — persistent task queue via `cds.queued(srv).schedule(...).every(...)`. Single-winner across instances, survives restarts, retry + dead-letter. Underlying CAP API is experimental. See the [queued scheduling recipe](https://mikezaschka.github.io/cds-data-pipeline/recipes/internal-scheduling-queued/).
 

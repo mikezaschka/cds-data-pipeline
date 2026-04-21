@@ -34,7 +34,8 @@ An OData service for operating pipelines at runtime. See [Management Service](ma
 |---|---|
 | **`Pipelines`** | Read-only listing of all registered pipelines with source / target config, status, last sync, and statistics. |
 | **`PipelineRuns`** | Per-run history with start / end timestamps, trigger, mode, statistics, and error details. |
-| **`run` action** | Trigger a pipeline run programmatically or via HTTP. |
+| **`execute` action** | Trigger a pipeline run programmatically or via unbound HTTP `POST /pipeline/execute`. |
+| **`start` action** | Bound to `Pipelines` — same run as `execute` with the pipeline name taken from the entity key (Fiori Elements object pages). |
 | **`flush` action** | Clear pipeline output and reset tracker for a named pipeline. |
 | **`status` function** | Get the current status of a named pipeline. |
 
@@ -55,7 +56,7 @@ Three ways to drive a pipeline. Pick the one that matches your operational model
 |---|---|---|
 | **In-process `spawn` scheduling** (default) | Periodic runs driven by `cds.spawn({ every })`. `schedule: 600000` or `schedule: { every, engine: 'spawn' }`. Best-effort; fires on every app instance. | Single-instance deployments, dev, best-effort cadence. |
 | **In-process `queued` scheduling** | Persistent task queue via `cds.queued(srv).schedule(...).every(...)`. `schedule: { every: '10m', engine: 'queued' }`. Single-winner across app instances, survives restarts, retries with exponential backoff. Requires `cds.outbox.Messages`; underlying CAP API is experimental. | Self-contained CAP apps running with >1 instance that want persistence and cross-instance safety. See [Recipes → Internal scheduling with the queued engine](../recipes/internal-scheduling-queued.md). |
-| **External trigger** | Omit `schedule` entirely and call `POST /pipeline/run` from an external scheduler (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...). The `run` action accepts `trigger` and `async` parameters for correct attribution and fire-and-forget 202 responses. | Centralized corporate cron, BTP-native operations, org-level observability. See [Recipes → External scheduling with SAP BTP Job Scheduling Service](../recipes/external-scheduling-jss.md). |
+| **External trigger** | Omit `schedule` entirely and call `POST /pipeline/execute` from an external scheduler (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...). The `execute` action accepts `trigger` and `async` parameters for correct attribution and fire-and-forget 202 responses. | Centralized corporate cron, BTP-native operations, org-level observability. See [Recipes → External scheduling with SAP BTP Job Scheduling Service](../recipes/external-scheduling-jss.md). |
 | **Manual trigger** | Programmatic `run()` API and the `run` OData action. | Ad-hoc runs, scripts, tests. |
 
 ## Resilience

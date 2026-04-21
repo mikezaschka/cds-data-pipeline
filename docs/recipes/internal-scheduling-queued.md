@@ -102,5 +102,5 @@ The returned envelope omits `done` because the run may execute on another instan
 ## See also
 
 - [External scheduling with SAP BTP Job Scheduling Service](external-scheduling-jss.md) — when centralized BTP-native cron is the better fit.
-- [Reference → Management Service](../reference/management-service.md) — the `run` action JSS and scripts call, plus the `RunTrigger` enum.
+- [Reference → Management Service](../reference/management-service.md) — the `execute` action JSS and scripts call, plus the `RunTrigger` enum.
 - [CAP docs: Queueing with `cds.queued`](https://cap.cloud.sap/docs/node.js/queue) — task queue configuration (`maxAttempts`, `timeout`, `legacyLocking`, ...).

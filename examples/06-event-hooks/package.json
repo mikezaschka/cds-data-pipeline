@@ -1,0 +1,33 @@
+{
+    "name": "cds-data-pipeline-example-06-event-hooks",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "start": "cds-serve --port 4106"
+    },
+    "dependencies": {
+        "@sap/cds": "^9.2",
+        "express": "^4",
+        "cds-data-pipeline": "file:../.."
+    },
+    "devDependencies": {
+        "@cap-js/sqlite": "^2"
+    },
+    "cds": {
+        "requires": {
+            "db": {
+                "kind": "sqlite",
+                "credentials": {
+                    "url": ":memory:"
+                }
+            },
+            "LogisticsService": {
+                "kind": "odata",
+                "model": "srv/external/LogisticsService",
+                "credentials": {
+                    "url": "http://localhost:4455/odata/v4/logistics"
+                }
+            }
+        }
+    }
+}

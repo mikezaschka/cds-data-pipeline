@@ -1,4 +1,4 @@
-const cds = require('@sap/cds')
+const cds = require('./runtime-cds')
 const Pipeline = require('./lib/Pipeline')
 
 const LOG = cds.log('cds-data-pipeline')
@@ -43,6 +43,21 @@ const DOC_REF_FAN_IN = `See https://mikezaschka.github.io/cds-data-pipeline/reci
  */
 class DataPipelineService extends cds.Service {
 
+    /**
+     * `cds.connect.to()` constructs the service with the full app model. The
+     * base `namespace` getter would then pick `model.namespace` (e.g. the
+     * consumer package) instead of falling back to `this.name`. `dispatch`
+     * would rewrite `req.path` in `_ensure_target` / `_ensure_fqn`, and user
+     * hooks registered as `srv.before('PIPELINE.*', pipelineName, …)` — which
+     * CAP canonicalizes to `${srv.name}.${pipelineName}` — would no longer
+     * match. This orchestrator is not a modeled OData surface; keep the
+     * namespace equal to the service name so `Pipeline._makeReq` paths stay
+     * stable.
+     */
+    get namespace() {
+        return this.name
+    }
+
     async init() {
         this.pipelines = new Map()
 
@@ -76,6 +91,7 @@ class DataPipelineService extends cds.Service {
         })
 
         await super.init()
+        LOG._info && LOG.info('cds-data-pipeline ready')
     }
 
     /**
@@ -104,7 +120,7 @@ class DataPipelineService extends cds.Service {
                 this._scheduleJob(name, internalConfig.schedule)
                 LOG._info && LOG.info(
                     `Pipeline '${name}' has an internal schedule (engine=${internalConfig.schedule.engine}). ` +
-                    `Omit 'schedule' and call POST /pipeline/run from an external scheduler ` +
+                    `Omit 'schedule' and call POST /pipeline/execute from an external scheduler ` +
                     `(SAP BTP Job Scheduling, Kubernetes CronJob, ...) if centralized scheduling is preferred.`
                 )
             }
@@ -290,7 +306,7 @@ class DataPipelineService extends cds.Service {
                 `addPipeline: schedule.engine='queued' requires a CAP runtime that exposes ` +
                 `cds.queued(srv).schedule(...).every(...). Update @sap/cds, or use ` +
                 `schedule: <ms> / schedule: { every, engine: 'spawn' } / omit schedule ` +
-                `and trigger externally via POST /pipeline/run.`
+                `and trigger externally via POST /pipeline/execute.`
             )
         }
 
@@ -551,7 +567,7 @@ class DataPipelineService extends cds.Service {
      *
      * Accepted shapes:
      *   - unset / null / 0 / ''   -> `undefined` (no internal timer; external
-     *                                trigger via POST /pipeline/run is the
+     *                                trigger via POST /pipeline/execute is the
      *                                expected path).
      *   - number (milliseconds)    -> `{ every: <number>, engine: 'spawn' }`
      *                                (backwards-compatible default).

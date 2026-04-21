@@ -1,4 +1,4 @@
-const cds = require('@sap/cds')
+const cds = require('../runtime-cds')
 
 /**
  * Abstract source adapter. A source adapter is the protocol-specific

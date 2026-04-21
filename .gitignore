@@ -9,6 +9,10 @@ gen/
 node_modules/
 target/
 
+# Test fixture installs
+test/fixtures/**/node_modules/
+test/fixtures/**/*.db
+
 # Web IDE, App Studio
 .che/
 .gen/

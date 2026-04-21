@@ -1,4 +1,4 @@
-const cds = require('@sap/cds')
+const cds = require('../runtime-cds')
 const BaseSourceAdapter = require('./BaseSourceAdapter')
 const ODataAdapter = require('./ODataAdapter')
 const RestAdapter = require('./RestAdapter')

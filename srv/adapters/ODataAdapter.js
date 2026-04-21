@@ -1,4 +1,4 @@
-const cds = require('@sap/cds')
+const cds = require('../runtime-cds')
 const BaseSourceAdapter = require('./BaseSourceAdapter')
 const { withRetry } = require('../lib/retry')
 
@@ -19,7 +19,11 @@ class ODataAdapter extends BaseSourceAdapter {
         }
 
         const deltaFilter = this._buildDeltaFilter(delta, tracker)
-        if (deltaFilter && Object.keys(deltaFilter).length > 0) {
+        const hasDelta = deltaFilter && (
+            (typeof deltaFilter === 'string' && deltaFilter.length > 0) ||
+            (typeof deltaFilter === 'object' && Object.keys(deltaFilter).length > 0)
+        )
+        if (hasDelta) {
             baseQuery = baseQuery.where(deltaFilter)
         }
 

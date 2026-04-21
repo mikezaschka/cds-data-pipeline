@@ -1,0 +1,32 @@
+{
+    "name": "cds-data-pipeline-example-02-replicate-rest",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "start": "cds-serve --port 4102"
+    },
+    "dependencies": {
+        "@sap/cds": "^9.2",
+        "express": "^4",
+        "cds-data-pipeline": "file:../.."
+    },
+    "devDependencies": {
+        "@cap-js/sqlite": "^2"
+    },
+    "cds": {
+        "requires": {
+            "db": {
+                "kind": "sqlite",
+                "credentials": {
+                    "url": ":memory:"
+                }
+            },
+            "FXService": {
+                "kind": "rest",
+                "credentials": {
+                    "url": "http://localhost:4456"
+                }
+            }
+        }
+    }
+}

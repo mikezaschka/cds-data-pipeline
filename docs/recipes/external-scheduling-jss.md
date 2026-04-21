@@ -2,11 +2,11 @@
 
 **When to pick this recipe:** you want a managed, BTP-native cron schedule for one or more pipelines instead of the in-process `schedule` timer. This is the right shape for production setups that already rely on BTP operations (monitoring, corporate cron policies, centralized run history).
 
-The plugin is pluggable by design: omit `schedule` in `addPipeline(...)` and no internal timer runs. [SAP BTP Job Scheduling Service (JSS)](https://discovery-center.cloud.sap/serviceCatalog/job-scheduling-service?region=all) (or any external cron — Kubernetes `CronJob`, GitHub Actions, Airflow, ...) then calls `POST /pipeline/run` to drive the pipeline.
+The plugin is pluggable by design: omit `schedule` in `addPipeline(...)` and no internal timer runs. [SAP BTP Job Scheduling Service (JSS)](https://discovery-center.cloud.sap/serviceCatalog/job-scheduling-service?region=all) (or any external cron — Kubernetes `CronJob`, GitHub Actions, Airflow, ...) then calls `POST /pipeline/execute` to drive the pipeline.
 
 ```mermaid
 flowchart LR
-  JSS[BTP Job Scheduling Service] -->|"OAuth2 client creds POST /pipeline/run"| Mgmt[DataPipelineManagementService]
+  JSS[BTP Job Scheduling Service] -->|"OAuth2 client creds POST /pipeline/execute"| Mgmt[DataPipelineManagementService]
   Mgmt --> Pipe[Pipeline runs]
   Pipe -->|"trigger=external"| Tracker[(PipelineRuns)]
 ```
@@ -36,7 +36,7 @@ module.exports = async () => {
 
 ## 2. Secure the management action
 
-Add a `PipelineRunner` scope to `xs-security.json` so only the JSS technical user can POST `/pipeline/run`. The plugin annotates the action with `@(requires: 'PipelineRunner')`.
+The plugin does **not** declare `@(requires: ...)` on `DataPipelineManagementService`. In your CAP app, define the scopes and roles you need — for example a `PipelineRunner` scope carried only by the JSS technical user — and attach `@(requires: 'PipelineRunner')` (or equivalent) to `execute` / `flush` / `start` in **your** CDS model, alongside the XSUAA configuration below.
 
 ```json
 {
@@ -44,7 +44,7 @@ Add a `PipelineRunner` scope to `xs-security.json` so only the JSS technical use
   "tenant-mode": "dedicated",
   "scopes": [
     { "name": "$XSAPPNAME.PipelineRunner",
-      "description": "Trigger pipelines via /pipeline/run",
+      "description": "Trigger pipelines via /pipeline/execute",
       "grant-as-authority-to-apps": [ "$XSSERVICENAME(cds-data-pipeline-jobscheduler)" ]
     }
   ],
@@ -100,7 +100,7 @@ Once the app is deployed, create a JSS job that POSTs into the management servic
 {
   "name": "replicate-business-partners",
   "description": "Replicate API_BUSINESS_PARTNER into the local DB every 10 minutes",
-  "action": "https://cds-data-pipeline-srv.cfapps.<region>.hana.ondemand.com/pipeline/run",
+  "action": "https://cds-data-pipeline-srv.cfapps.<region>.hana.ondemand.com/pipeline/execute",
   "httpMethod": "POST",
   "active": true,
   "schedules": [
@@ -129,7 +129,7 @@ Key fields:
 ## Action parameter reference
 
 ```
-POST /pipeline/run
+POST /pipeline/execute
 Content-Type: application/json
 Authorization: Bearer <JSS-issued JWT>
 

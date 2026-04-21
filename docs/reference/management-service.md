@@ -51,33 +51,24 @@ entity PipelineRuns : cuid {
 }
 ```
 
-The management OData service (`DataPipelineManagementService`, served at `/pipeline`) projects both entities read-only plus three actions. All mutating actions require the `PipelineRunner` scope; read projections require an authenticated user.
+The management OData service (`DataPipelineManagementService`, served at `/pipeline`) projects both tracker entities read-only. `Pipelines` also exposes a **bound** `start` action (same semantics as `execute`, but keyed from the entity instance — useful for Fiori Elements object pages). The service adds the unbound actions `execute` and `flush`, plus the `status` function.
+
+The plugin ships **no** `@(requires: ...)` annotations on this service. Your application decides how `/pipeline` is secured: annotate projections and operations in consumer CDS, define XSUAA scopes and role templates in `xs-security.json`, use the application router, or a combination.
+
+The full CDS (including `Common.ValueList` on the `start` parameters) is in the npm package at `srv/DataPipelineManagementService.cds`. Value-help rows for `PipelineRunModes` / `PipelineRunTriggers` are returned by `srv/DataPipelineManagementService.js` and are not stored in the database.
+
+### Securing `/pipeline` in your app
+
+After you add scopes and roles (for example a dedicated “pipeline runner” scope for schedulers), attach CAP authorization hints only in **your** model — for example annotate the projections that the plugin exposes:
 
 ```cds
-using { plugin.data_pipeline as pipeline } from '../db/index.cds';
+using from 'cds-data-pipeline/srv/DataPipelineManagementService';
 
-service DataPipelineManagementService @(path: '/pipeline') {
-    @readonly @(requires: 'authenticated-user')
-    entity Pipelines    as projection on pipeline.Pipelines;
-
-    @readonly @(requires: 'authenticated-user')
-    entity PipelineRuns as projection on pipeline.PipelineRuns;
-
-    @(requires: 'PipelineRunner')
-    action   run(
-        name    : String,
-        mode    : String,
-        trigger : String,
-        async   : Boolean
-    ) returns String;
-
-    @(requires: 'PipelineRunner')
-    action   flush(name : String) returns String;
-
-    @(requires: 'authenticated-user')
-    function status(name : String) returns Pipelines;
-}
+annotate DataPipelineManagementService.Pipelines with @(requires: 'authenticated-user');
+annotate DataPipelineManagementService.PipelineRuns with @(requires: 'authenticated-user');
 ```
+
+Use the same idea for mutating operations (`execute`, `start`, `flush`) and for `status` as your threat model requires. Depending on your CAP version, that may be additional `annotate` targets, an `extend service` block, or app-level enforcement only.
 
 ## Entities
 
@@ -114,7 +105,7 @@ GET /pipeline/PipelineRuns?$filter=pipeline_name eq 'BusinessPartners'&$orderby=
 |---|---|
 | `ID` | Run identifier (`cuid`). |
 | `pipeline` | Association to the owning `Pipelines` row (`pipeline_name` on the wire). |
-| `trigger` | `manual` \| `scheduled` \| `external` \| `event`. `scheduled` is set by the in-process scheduler; `external` is set when the caller of `POST /pipeline/run` passes `trigger: "external"` (used by BTP Job Scheduling Service, Kubernetes `CronJob`, ...). |
+| `trigger` | `manual` \| `scheduled` \| `external` \| `event`. `scheduled` is set by the in-process scheduler; `external` is set when the caller of `POST /pipeline/execute` passes `trigger: "external"` (used by BTP Job Scheduling Service, Kubernetes `CronJob`, ...). |
 | `mode` | `full` \| `delta`. |
 | `startTime` / `endTime` | ISO timestamps. |
 | `status` | `running` \| `idle` \| `failed`. |
@@ -123,14 +114,30 @@ GET /pipeline/PipelineRuns?$filter=pipeline_name eq 'BusinessPartners'&$orderby=
 
 ## Actions
 
-### `run`
+### `start` (bound to `Pipelines`)
+
+Triggers a run for the pipeline identified by the entity key (`name`). Use this shape when the client already has a `Pipelines` instance binding (for example a Fiori Elements **Start pipeline** action on the object page). `mode` and `trigger` use the tracker enums (`ReplicationMode`, `RunTrigger`). CAP still exposes OData action parameters as strings, so the UI gets **fixed-value dropdowns** via `Common.ValueList` / `ValueListWithFixedValues` on the `start` parameters, backed by the read-only, non-persisted entity sets **`PipelineRunModes`** and **`PipelineRunTriggers`** (served from static data in `DataPipelineManagementService.js`). Values outside those enums (for example `partial-refresh`) remain available only on unbound [`execute`](#execute).
+
+```http
+POST /pipeline/Pipelines('ReplicatedPartners')/DataPipelineManagementService.start
+Content-Type: application/json
+
+{
+  "mode": "full",
+  "trigger": "external",
+  "async": true
+}
+```
+
+Body properties are `mode`, `trigger`, and `async` (same meaning as in [`execute`](#execute)); the pipeline `name` comes from the URL key, not the body.
+
+### `execute`
 
 Trigger a pipeline execution. Used by scripts, tests, and external schedulers (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...).
 
 ```http
-POST /pipeline/run
+POST /pipeline/execute
 Content-Type: application/json
-Authorization: Bearer <token with PipelineRunner scope>
 
 {
   "name": "ReplicatedPartners",
@@ -139,6 +146,8 @@ Authorization: Bearer <token with PipelineRunner scope>
   "async": true
 }
 ```
+
+Send `Authorization` (or any other headers your deployment expects) if you configured authentication on the management service.
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|

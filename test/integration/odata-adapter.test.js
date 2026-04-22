@@ -6,11 +6,15 @@ const { getPipelineService, waitForConsumerFixturePipelines } = require('../supp
 const consumerRoot = path.join(__dirname, '../fixtures/consumer')
 
 describe('ODataAdapter integration', () => {
-    cds.test(consumerRoot)
     const { expect } = require('@jest/globals')
 
     beforeAll(async () => {
         await startProvider()
+    }, 60000)
+
+    cds.test(consumerRoot)
+
+    beforeAll(async () => {
         await waitForConsumerFixturePipelines()
     }, 60000)
     afterAll(async () => {

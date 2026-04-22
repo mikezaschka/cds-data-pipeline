@@ -1,14 +1,25 @@
 const path = require('path')
 const cds = require('@sap/cds')
+const { startProvider, stopProvider } = require('../support/setup')
 const { getPipelineService, waitForConsumerFixturePipelines } = require('../support/helpers')
 
 const consumerRoot = path.join(__dirname, '../fixtures/consumer')
 
 describe('Materialize partial refresh', () => {
-    cds.test(consumerRoot)
     const { expect } = require('@jest/globals')
 
-    beforeAll(waitForConsumerFixturePipelines)
+    beforeAll(async () => {
+        await startProvider()
+    }, 60000)
+
+    cds.test(consumerRoot)
+
+    beforeAll(async () => {
+        await waitForConsumerFixturePipelines()
+    }, 60000)
+    afterAll(async () => {
+        await stopProvider()
+    })
 
     it('refresh.slice deletes only matching rows before insert', async () => {
         const srv = await getPipelineService()

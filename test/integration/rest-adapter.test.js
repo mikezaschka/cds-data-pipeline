@@ -1,20 +1,24 @@
 const path = require('path')
 const cds = require('@sap/cds')
-const { startRestProvider, stopRestProvider } = require('../support/setup')
+const { startProvider, stopProvider, startRestProvider, stopRestProvider } = require('../support/setup')
 const { getPipelineService, waitForConsumerFixturePipelines } = require('../support/helpers')
 
 const consumerRoot = path.join(__dirname, '../fixtures/consumer')
 
 describe('RestAdapter integration', () => {
-    cds.test(consumerRoot)
     const { expect } = require('@jest/globals')
 
     beforeAll(async () => {
-        await startRestProvider()
+        await Promise.all([startProvider(), startRestProvider()])
+    }, 60000)
+
+    cds.test(consumerRoot)
+
+    beforeAll(async () => {
         await waitForConsumerFixturePipelines()
-    }, 30000)
+    }, 60000)
     afterAll(async () => {
-        await stopRestProvider()
+        await Promise.all([stopProvider(), stopRestProvider()])
     })
 
     it('offset pagination + dataPath replicates customers', async () => {

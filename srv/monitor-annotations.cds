@@ -17,7 +17,7 @@ annotate DataPipelineManagementService.Pipelines with @(
             TypeName       : 'Pipeline',
             TypeNamePlural : 'Pipelines',
             Title          : { Value: name },
-            Description    : { Value: status }
+            Description    : { Value: description }
         },
         Identification: [
             {
@@ -25,10 +25,23 @@ annotate DataPipelineManagementService.Pipelines with @(
                 Action             : 'DataPipelineManagementService.start',
                 Label              : 'Start pipeline',
                 InvocationGrouping : #Isolated
+            },
+            {
+                $Type              : 'UI.DataFieldForAction',
+                Action             : 'DataPipelineManagementService.setSchedule',
+                Label              : 'Set internal schedule',
+                InvocationGrouping : #Isolated
+            },
+            {
+                $Type              : 'UI.DataFieldForAction',
+                Action             : 'DataPipelineManagementService.clearSchedule',
+                Label              : 'Clear internal schedule',
+                InvocationGrouping : #Isolated
             }
         ],
         LineItem: [
             { Value: name,                       Label: 'Name' },
+            { Value: description,                Label: 'Description' },
             { Value: status,                     Label: 'Status' },
             { Value: mode,                       Label: 'Mode' },
             { Value: origin,                     Label: 'Origin' },
@@ -46,6 +59,7 @@ annotate DataPipelineManagementService.Pipelines with @(
         FieldGroup #Overview: {
             Data: [
                 { Value: name },
+                { Value: description, Label: 'Description' },
                 { Value: status },
                 { Value: mode },
                 { Value: origin },

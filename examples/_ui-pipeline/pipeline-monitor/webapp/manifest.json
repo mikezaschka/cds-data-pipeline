@@ -103,7 +103,7 @@
       "cozy": true
     },
     "pipelineMonitor": {
-      "refreshIntervalSeconds": 5
+      "refreshIntervalSeconds": 30
     }
   }
 }

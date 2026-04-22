@@ -28,11 +28,20 @@
             applications: {
                 'pipeline-monitor': {
                     title: 'Pipeline Monitor',
-                    subTitle: 'Admin',
-                    description: 'Tracker + run history',
+                    subTitle: 'Fiori elements',
+                    description: 'List report and object page',
                     additionalInformation: 'SAPUI5.Component=pipeline.monitor',
                     applicationType: 'URL',
-                    url: './pipeline-monitor/webapp',
+                    url: '/pipeline-monitor',
+                    navigationMode: 'embedded'
+                },
+                'pipeline-console': {
+                    title: 'Pipeline Console',
+                    subTitle: 'Flexible column layout',
+                    description: 'FCL console: pipelines, detail, and runs',
+                    additionalInformation: 'SAPUI5.Component=pipeline.monitor.fcl',
+                    applicationType: 'URL',
+                    url: '/pipeline-console',
                     navigationMode: 'embedded'
                 }
             }
@@ -41,7 +50,7 @@
     <script src="https://ui5.sap.com/test-resources/sap/ushell/bootstrap/sandbox.js"></script>
     <script
         src="https://ui5.sap.com/resources/sap-ui-core.js"
-        data-sap-ui-libs="sap.m, sap.ushell, sap.fe.templates"
+        data-sap-ui-libs="sap.m, sap.ushell, sap.fe.templates, sap.f"
         data-sap-ui-compatVersion="edge"
         data-sap-ui-theme="sap_horizon"
         data-sap-ui-frameOptions="allow"

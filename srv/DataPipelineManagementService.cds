@@ -20,6 +20,13 @@ service DataPipelineManagementService @(path: '/pipeline') {
 
     @readonly
     entity Pipelines as projection on pipeline.Pipelines actions {
+        /** Stops the in-process `cds.spawn({ every })` schedule. Not supported for `schedule.engine: 'queued'` (change requires restart). */
+        action clearSchedule() returns String;
+        /**
+         * Sets or replaces the internal **spawn** schedule: `every` is the interval in ms between delta runs.
+         * Fails if the pipeline was registered with `schedule.engine: 'queued'`.
+         */
+        action setSchedule( every : Integer ) returns String;
         action start(
             @(Common: {
                 ValueListWithFixedValues : true,

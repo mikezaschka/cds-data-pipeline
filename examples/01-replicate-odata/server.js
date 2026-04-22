@@ -23,6 +23,7 @@ cds.on('served', async () => {
     //   via `POST /pipeline/execute`.
     await pipelines.addPipeline({
         name: 'Shipments',
+        description: 'Replicates logistics shipments into the local consumption view (OData V4 delta by modifiedAt).',
         source: { service: 'LogisticsService', entity: 'LogisticsService.Shipments' },
         target: { entity: 'example01.Shipments' },
 

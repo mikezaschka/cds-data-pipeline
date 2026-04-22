@@ -17,6 +17,20 @@ describe('PIPELINE lifecycle hooks', () => {
         await stopProvider()
     })
 
+    it('persists optional description on the tracker row', async () => {
+        const srv = await getPipelineService()
+        const name = `__lc_desc_${Date.now()}`
+        const description = 'Integration test pipeline description'
+        await srv.addPipeline({
+            name,
+            description,
+            source: { service: 'ProviderService', entity: 'Customers' },
+            target: { entity: 'consumer.ReplicatedCustomersV2' },
+        })
+        const row = await srv.getStatus(name)
+        expect(row.description).toBe(description)
+    })
+
     it('correlates runId across START and DONE', async () => {
         const srv = await getPipelineService()
         const name = `__lc_run_${Date.now()}`

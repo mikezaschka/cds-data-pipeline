@@ -8,10 +8,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 EXAMPLE_PORT=4106
 LOGISTICS_PORT=4455
 
-rm -rf "$SCRIPT_DIR/app"
-mkdir -p "$SCRIPT_DIR/app"
-cp -R "$REPO_ROOT/examples/_monitor-app/pipeline-monitor" "$SCRIPT_DIR/app/"
-cp    "$REPO_ROOT/examples/_monitor-app/launchpage.html"    "$SCRIPT_DIR/app/"
+# Pipeline UIs: examples/_ui-pipeline/ + cds-plugin-ui5 (see package.json).
 
 if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
     echo "[example-06] Installing dependencies..."
@@ -49,7 +46,7 @@ echo ""
 echo "[example-06] Ready."
 echo "  OData:    http://localhost:$EXAMPLE_PORT/odata/v4/example/Shipments"
 echo "  Metrics:  http://localhost:$EXAMPLE_PORT/odata/v4/example/BatchMetrics"
-echo "  Monitor:  http://localhost:$EXAMPLE_PORT/launchpage.html"
+echo "  Launchpad: http://localhost:$EXAMPLE_PORT/launchpage.html  (cds-plugin-ui5: /pipeline-monitor, /pipeline-console)"
 echo ""
 
 wait

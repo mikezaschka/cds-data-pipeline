@@ -2,12 +2,14 @@
 
 Six small, self-contained examples — one per plugin entry point — built on top of two shared backend services. Each example is a runnable CAP app: its own `package.json`, `db/`, `srv/`, `http/` scenarios, `start.sh`, and a README that walks through one feature of `cds-data-pipeline`.
 
-Every example also bundles the shared **Pipeline Monitor** FE app so you can watch runs, error counts, and statistics in a browser at `http://localhost:<port>/launchpage.html`.
+Each example is meant to include the two monitor UIs (Fiori Elements **Pipeline Monitor** and the freestyle **Pipeline Console** with `sap.f.FlexibleColumnLayout`) so you can watch runs, error counts, and statistics in a browser at `http://localhost:<port>/launchpage.html` (the launchpad has a tile for each app).
+
+**One shared implementation** lives in [`_ui-pipeline/`](_ui-pipeline/): two UI5 Tooling 3 projects (`pipeline-monitor`, `pipeline-console`, TypeScript + `ui5 build`). Every example’s `package.json` links them with **`file:`** devDependencies; **[cds-plugin-ui5](https://github.com/ui5-community/ui5-ecosystem-showcase/tree/main/packages/cds-plugin-ui5)** serves them at `/pipeline-monitor` and `/pipeline-console` on the same origin as the CAP server. The sandbox `launchpage.html` is a single file in `_ui-pipeline/`; each example’s `app/launchpage.html` is a **symlink** to it. After changing the UIs, run `npm run ui:build` in any example (or `cd examples/_ui-pipeline && npm install && npm run build`).
 
 ## Shared substrate
 
 - `_providers/` — two reusable backends (LogisticsService CAP V4, FXService REST) plus a `start-providers.sh` script. See [_providers/README.md](_providers/README.md).
-- `_monitor-app/` — the Pipeline Monitor FE app (generator + `webapp/` + launchpad). Fiori annotations live in the plugin at [`srv/monitor-annotations.cds`](../srv/monitor-annotations.cds). See [_monitor-app/README.md](_monitor-app/README.md).
+- `_ui-pipeline/` — Fiori monitor + FCL console + launchpad (TypeScript, **cds-plugin-ui5**). See [_ui-pipeline/README.md](_ui-pipeline/README.md). Fiori list/object **annotations** for the management service live in the plugin at [`srv/monitor-annotations.cds`](../srv/monitor-annotations.cds) (not under `_ui-pipeline/`).
 
 ## Example catalogue
 
@@ -43,7 +45,7 @@ Each example has a self-contained `start.sh` that launches its required provider
 # Pick any example; its README is the walkthrough
 bash examples/01-replicate-odata/start.sh
 
-# Visit http://localhost:4101/launchpage.html for the Pipeline Monitor,
+# Visit http://localhost:4101/launchpage.html for the Pipeline Monitor and Pipeline Console,
 # and http://localhost:4101/odata/v4/... for the example's own OData service.
 # Run the .http scenarios in examples/01-replicate-odata/http/ via the
 # VS Code REST Client extension.

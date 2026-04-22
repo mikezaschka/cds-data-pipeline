@@ -8,10 +8,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 EXAMPLE_PORT=4102
 FX_PORT=4456
 
-rm -rf "$SCRIPT_DIR/app"
-mkdir -p "$SCRIPT_DIR/app"
-cp -R "$REPO_ROOT/examples/_monitor-app/pipeline-monitor" "$SCRIPT_DIR/app/"
-cp    "$REPO_ROOT/examples/_monitor-app/launchpage.html"    "$SCRIPT_DIR/app/"
+# Pipeline UIs: examples/_ui-pipeline/ + cds-plugin-ui5 (see package.json).
 
 if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
     echo "[example-02] Installing dependencies..."
@@ -48,7 +45,8 @@ pids+=($!)
 echo ""
 echo "[example-02] Ready."
 echo "  OData:            http://localhost:$EXAMPLE_PORT/odata/v4/example/ExchangeRates"
-echo "  Pipeline Monitor: http://localhost:$EXAMPLE_PORT/launchpage.html"
+echo "  Launchpad:        http://localhost:$EXAMPLE_PORT/launchpage.html"
+echo "  (tiles: /pipeline-monitor, /pipeline-console via cds-plugin-ui5)"
 echo "  FXService direct: http://localhost:$FX_PORT/api/rates"
 echo ""
 

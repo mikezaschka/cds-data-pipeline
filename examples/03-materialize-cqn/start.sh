@@ -4,14 +4,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 EXAMPLE_PORT=4103
 
-rm -rf "$SCRIPT_DIR/app"
-mkdir -p "$SCRIPT_DIR/app"
-cp -R "$REPO_ROOT/examples/_monitor-app/pipeline-monitor" "$SCRIPT_DIR/app/"
-cp    "$REPO_ROOT/examples/_monitor-app/launchpage.html"    "$SCRIPT_DIR/app/"
+# Pipeline UIs: examples/_ui-pipeline/ + cds-plugin-ui5 (see package.json).
 
 if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
     echo "[example-03] Installing dependencies..."
@@ -24,7 +20,7 @@ pid=$(lsof -ti:$EXAMPLE_PORT 2>/dev/null || true)
 echo "[example-03] Starting on :$EXAMPLE_PORT ..."
 echo "  SalesService:     http://localhost:$EXAMPLE_PORT/odata/v4/sales/Orders"
 echo "  ReportingService: http://localhost:$EXAMPLE_PORT/odata/v4/reporting/DailyCustomerRevenue"
-echo "  Pipeline Monitor: http://localhost:$EXAMPLE_PORT/launchpage.html"
+echo "  Launchpad:        http://localhost:$EXAMPLE_PORT/launchpage.html  (cds-plugin-ui5: /pipeline-monitor, /pipeline-console)"
 echo ""
 
 cd "$SCRIPT_DIR"

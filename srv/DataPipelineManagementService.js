@@ -59,6 +59,27 @@ class DataPipelineManagementService extends cds.ApplicationService {
             return runPipelineExecute(req, name, req.data)
         })
 
+        this.on('clearSchedule', 'Pipelines', async (req) => {
+            const { name } = req.params[0]
+            try {
+                const srv = await cds.connect.to('DataPipelineService')
+                return await srv.clearSchedule(name)
+            } catch (err) {
+                req.error(500, `clearSchedule for '${name}' failed: ${err.message}`)
+            }
+        })
+
+        this.on('setSchedule', 'Pipelines', async (req) => {
+            const { name } = req.params[0]
+            const { every } = req.data
+            try {
+                const srv = await cds.connect.to('DataPipelineService')
+                return await srv.setSchedule(name, { every })
+            } catch (err) {
+                req.error(500, `setSchedule for '${name}' failed: ${err.message}`)
+            }
+        })
+
         this.on('execute', async (req) => {
             const { name } = req.data
             return runPipelineExecute(req, name, req.data)

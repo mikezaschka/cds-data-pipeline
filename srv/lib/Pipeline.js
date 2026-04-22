@@ -487,9 +487,12 @@ class Pipeline {
 
     async _ensureTracker() {
         const existing = await SELECT.one.from(PIPELINES).where({ name: this.name })
+        const desc = this.config.description != null && this.config.description !== '' ? this.config.description : null
+
         if (!existing) {
             await INSERT.into(PIPELINES).entries({
                 name: this.name,
+                description: desc,
                 source: JSON.stringify(this.config.source, this._safeReplacer),
                 target: JSON.stringify(this.config.target, this._safeReplacer),
                 mode: this.config.mode,
@@ -500,11 +503,21 @@ class Pipeline {
                 statistics_updated: 0,
                 statistics_deleted: 0,
             })
-        } else if (this.origin && existing.origin !== this.origin) {
-            // Re-registrations that change origin (or set it for the first
-            // time on a legacy tracker row) should update the stored label
-            // so the management projection stays in sync.
-            await UPDATE(PIPELINES).set({ origin: this.origin }).where({ name: this.name })
+        } else {
+            // Re-registrations: keep origin / description in sync with config
+            // (same process as a restart with an updated addPipeline in server.js).
+            const patch = {}
+            if (this.origin && existing.origin !== this.origin) {
+                patch.origin = this.origin
+            }
+            const nextDesc = desc != null ? String(desc) : null
+            const existingDesc = existing.description != null ? String(existing.description) : null
+            if (nextDesc !== existingDesc) {
+                patch.description = desc
+            }
+            if (Object.keys(patch).length) {
+                await UPDATE(PIPELINES).set(patch).where({ name: this.name })
+            }
         }
     }
 

@@ -55,22 +55,23 @@ aspect sourced {
  */
 @cds.persistence.table
 entity Pipelines {
-    key name       : String;
-        source     : LargeString; // JSON serialized source config
-        target     : LargeString; // JSON serialized target config
-        mode       : ReplicationMode;
-        origin     : String(100); // ADR 0008: label stamped into target.source for multi-source fan-in
-        lastSync   : Timestamp;
-        lastKey    : String;
-        status     : RunStatus default 'idle';
-        errorCount : Integer default 0;
-        lastError  : String;
-        statistics : {
+    key name         : String;
+        description  : String(1024); // optional human-readable label for management UI
+        source         : LargeString; // JSON serialized source config
+        target         : LargeString; // JSON serialized target config
+        mode           : ReplicationMode;
+        origin         : String(100); // ADR 0008: label stamped into target.source for multi-source fan-in
+        lastSync       : Timestamp;
+        lastKey        : String;
+        status         : RunStatus default 'idle';
+        errorCount     : Integer default 0;
+        lastError      : String;
+        statistics     : {
             created : Integer default 0;
             updated : Integer default 0;
             deleted : Integer default 0;
         };
-        runs       : Composition of many PipelineRuns on runs.pipeline = $self;
+        runs           : Composition of many PipelineRuns on runs.pipeline = $self;
 }
 
 /**

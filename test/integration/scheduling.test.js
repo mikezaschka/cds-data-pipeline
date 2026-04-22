@@ -57,4 +57,23 @@ describe('Internal schedule (spawn)', () => {
             }),
         ).rejects.toThrow(/cds\.queued/)
     })
+
+    it('clearSchedule stops spawn ticks; setSchedule (re)starts', async () => {
+        const srv = await getPipelineService()
+        const name = `__sched_ctrl_${Date.now()}`
+        await srv.addPipeline({
+            name,
+            source: { service: 'ProviderService', entity: 'Customers' },
+            target: { entity: 'consumer.ReplicatedCustomersV2' },
+            schedule: 60_000,
+        })
+        await srv.clear(name)
+        expect(await srv.clearSchedule(name)).toMatch(/cleared/i)
+
+        await srv.setSchedule(name, { every: 200 })
+        await new Promise((r) => setTimeout(r, 900))
+        const runs = await SELECT.from('plugin_data_pipeline_PipelineRuns')
+        const mine = runs.filter((r) => r.pipeline_name === name)
+        expect(mine.length).toBeGreaterThan(0)
+    }, 20_000)
 })

@@ -23,6 +23,9 @@ const DOC_REF = `See https://mikezaschka.github.io/cds-data-pipeline/concepts/in
 const DOC_REF_FAN_IN = `See https://mikezaschka.github.io/cds-data-pipeline/recipes/multi-source/ ` +
     `for the multi-source fan-in rules.`
 
+/** Matches `plugin.data_pipeline.Pipelines.description` in db/index.cds */
+const PIPELINE_DESCRIPTION_MAX = 1024
+
 /**
  * CDS service that orchestrates configured pipelines.
  *
@@ -90,6 +93,9 @@ class DataPipelineService extends cds.Service {
             await pipeline._run(mode, trigger, runId)
         })
 
+        /** @type {Map<string, { engine: 'spawn'|'queued', em?: import('node:events').EventEmitter }>} */
+        this._scheduleRegistry = new Map()
+
         await super.init()
         LOG._info && LOG.info('cds-data-pipeline ready')
     }
@@ -117,7 +123,7 @@ class DataPipelineService extends cds.Service {
             this.pipelines.set(name, pipeline)
 
             if (internalConfig.schedule) {
-                this._scheduleJob(name, internalConfig.schedule)
+                this._startInternalSchedule(name, internalConfig.schedule)
                 LOG._info && LOG.info(
                     `Pipeline '${name}' has an internal schedule (engine=${internalConfig.schedule.engine}). ` +
                     `Omit 'schedule' and call POST /pipeline/execute from an external scheduler ` +
@@ -247,6 +253,53 @@ class DataPipelineService extends cds.Service {
     }
 
     /**
+     * Stops a **spawn** internal schedule and clears `pipeline.config.schedule`.
+     * Queued schedules are not cancelable at runtime; throws.
+     */
+    async clearSchedule(name) {
+        const pipeline = this.pipelines.get(name)
+        if (!pipeline) {
+            throw new Error(`Unknown pipeline: ${name}`)
+        }
+        if (pipeline.config && pipeline.config.schedule && pipeline.config.schedule.engine === 'queued') {
+            throw new Error(
+                `clearSchedule: pipeline '${name}' uses schedule.engine='queued'. ` +
+                `The persistent task queue cannot be stopped at runtime; ` +
+                `use schedule.engine='spawn' if you need clearSchedule / setSchedule, or restart the app.`
+            )
+        }
+        this._stopInternalSchedule(name)
+        if (pipeline.config) {
+            delete pipeline.config.schedule
+        }
+        return `Internal schedule cleared for pipeline '${name}'.`
+    }
+
+    /**
+     * Replaces the internal **spawn** schedule (`every` in ms). Queued registration cannot be changed at runtime.
+     */
+    async setSchedule(name, { every }) {
+        const pipeline = this.pipelines.get(name)
+        if (!pipeline) {
+            throw new Error(`Unknown pipeline: ${name}`)
+        }
+        if (pipeline.config && pipeline.config.schedule && pipeline.config.schedule.engine === 'queued') {
+            throw new Error(
+                `setSchedule: pipeline '${name}' was registered with schedule.engine='queued'. ` +
+                `Remove the queued schedule and restart, or add the pipeline with engine='spawn' only.`
+            )
+        }
+        const normalized = this._normalizeSchedule({ every, engine: 'spawn' }, name)
+        if (!normalized) {
+            throw new Error('setSchedule: `every` must be a positive interval (milliseconds).')
+        }
+        this._stopInternalSchedule(name)
+        pipeline.config.schedule = normalized
+        this._startInternalSchedule(name, normalized)
+        return `Schedule set for pipeline '${name}': every=${normalized.every}ms, engine=spawn.`
+    }
+
+    /**
      * Register an internal default handler for a pipeline phase.
      * Called by `Pipeline.init()` — not part of the public API.
      */
@@ -266,6 +319,38 @@ class DataPipelineService extends cds.Service {
     }
 
     /**
+     * Start internal timer(s) for a pipeline. `schedule` is `{ every, engine }` from `_normalizeConfig`.
+     * Spawn handles are stored so `clearInterval` can stop them; queued schedules are registered
+     * for diagnostics only (cannot be cancelled at runtime).
+     */
+    _startInternalSchedule(name, schedule) {
+        this._stopInternalSchedule(name)
+        const { every, engine } = schedule
+        if (engine === 'queued') {
+            this._scheduleQueued(name, every)
+            this._scheduleRegistry.set(name, { engine: 'queued' })
+            return
+        }
+        const em = this._scheduleSpawn(name, every)
+        if (em) {
+            this._scheduleRegistry.set(name, { engine: 'spawn', em })
+        }
+    }
+
+    /**
+     * Stop internal spawn `setInterval` if present. No-op if nothing registered.
+     */
+    _stopInternalSchedule(name) {
+        const rec = this._scheduleRegistry.get(name)
+        this._scheduleRegistry.delete(name)
+        if (!rec || rec.engine !== 'spawn' || !rec.em) return
+        const t = rec.em.timer
+        if (t) {
+            clearInterval(t)
+        }
+    }
+
+    /**
      * Dispatch a pipeline schedule to the configured engine. `schedule` has
      * already been normalized to `{ every, engine }` by `_normalizeConfig`.
      *
@@ -277,21 +362,17 @@ class DataPipelineService extends cds.Service {
      *     app instances, survives restarts, exponential retry + dead-letter
      *     via `cds.outbox.Messages`. The underlying CAP API is marked
      *     Alpha; opt in per-pipeline.
+     *
+     * @returns {import('node:events').EventEmitter|undefined} EventEmitter for spawn; undefined for invalid or queued
      */
-    _scheduleJob(name, schedule) {
-        const { every, engine } = schedule
-        if (engine === 'queued') return this._scheduleQueued(name, every)
-        return this._scheduleSpawn(name, every)
-    }
-
     _scheduleSpawn(name, every) {
         const interval = typeof every === 'number' ? every : parseInt(every, 10)
         if (!interval || interval <= 0) {
             LOG.warn(`Invalid schedule for '${name}': ${every}`)
-            return
+            return undefined
         }
         const pipeline = this.pipelines.get(name)
-        cds.spawn({ every: interval }, async () => {
+        return cds.spawn({ every: interval }, async () => {
             try {
                 await pipeline._run('delta', 'scheduled')
             } catch (err) {
@@ -345,6 +426,18 @@ class DataPipelineService extends cds.Service {
         const { name } = config
         if (!name) {
             throw new Error(`addPipeline requires 'name'`)
+        }
+
+        if (config.description !== undefined && config.description !== null) {
+            if (typeof config.description !== 'string') {
+                throw new Error(`addPipeline: description must be a string for pipeline '${name}'`)
+            }
+            const trimmed = config.description.trim()
+            if (trimmed.length > PIPELINE_DESCRIPTION_MAX) {
+                throw new Error(
+                    `addPipeline: description exceeds ${PIPELINE_DESCRIPTION_MAX} characters for pipeline '${name}'`
+                )
+            }
         }
 
         const source = config.source
@@ -525,8 +618,16 @@ class DataPipelineService extends cds.Service {
     _normalizeConfig(config) {
         const isQueryShape = !!(config.source && config.source.query)
 
+        const description =
+            config.description !== undefined &&
+            config.description !== null &&
+            String(config.description).trim() !== ''
+                ? String(config.description).trim()
+                : null
+
         const normalized = {
             name: config.name,
+            description,
             source: {
                 batchSize: 1000,
                 maxRetries: 3,

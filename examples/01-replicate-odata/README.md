@@ -13,8 +13,10 @@ bash examples/01-replicate-odata/start.sh
 ```
 
 - OData of the local replica: <http://localhost:4101/odata/v4/example/Shipments>
-- Pipeline Monitor FE app: <http://localhost:4101/launchpage.html>
+- Launchpad: <http://localhost:4101/launchpage.html> (tiles: `/pipeline-monitor`, `/pipeline-console` — served by [cds-plugin-ui5](https://github.com/ui5-community/ui5-ecosystem-showcase/tree/main/packages/cds-plugin-ui5))
 - Management service: <http://localhost:4101/pipeline/Pipelines>
+
+To rebuild the UI5 apps after editing TypeScript or `webapp/` in [`../_ui-pipeline/`](../_ui-pipeline/) (optional for dev, recommended before deploy), from this directory run `npm run ui:build` (or `cd ../_ui-pipeline && npm run build`).
 
 Stop with Ctrl+C.
 

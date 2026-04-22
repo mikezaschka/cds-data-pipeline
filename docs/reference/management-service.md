@@ -51,7 +51,7 @@ entity PipelineRuns : cuid {
 }
 ```
 
-The management OData service (`DataPipelineManagementService`, served at `/pipeline`) projects both tracker entities read-only. `Pipelines` also exposes a **bound** `start` action (same semantics as `execute`, but keyed from the entity instance — useful for Fiori Elements object pages). The service adds the unbound actions `execute` and `flush`, plus the `status` function.
+The management OData service (`DataPipelineManagementService`, served at `/pipeline`) projects both tracker entities read-only. `Pipelines` also exposes **bound** actions: `start` (same semantics as `execute`, but keyed from the entity instance), `setSchedule` / `clearSchedule` for in-process `cds.spawn({ every })` intervals (not for `schedule.engine: 'queued'`), and the unbound actions `execute` and `flush`, plus the `status` function.
 
 The plugin ships **no** `@(requires: ...)` annotations on this service. Your application decides how `/pipeline` is secured: annotate projections and operations in consumer CDS, define XSUAA scopes and role templates in `xs-security.json`, use the application router, or a combination.
 
@@ -68,7 +68,7 @@ annotate DataPipelineManagementService.Pipelines with @(requires: 'authenticated
 annotate DataPipelineManagementService.PipelineRuns with @(requires: 'authenticated-user');
 ```
 
-Use the same idea for mutating operations (`execute`, `start`, `flush`) and for `status` as your threat model requires. Depending on your CAP version, that may be additional `annotate` targets, an `extend service` block, or app-level enforcement only.
+Use the same idea for mutating operations (`execute`, `start`, `flush`, `setSchedule`, `clearSchedule`) and for `status` as your threat model requires. Depending on your CAP version, that may be additional `annotate` targets, an `extend service` block, or app-level enforcement only.
 
 ## Entities
 
@@ -130,6 +130,29 @@ Content-Type: application/json
 ```
 
 Body properties are `mode`, `trigger`, and `async` (same meaning as in [`execute`](#execute)); the pipeline `name` comes from the URL key, not the body.
+
+### `setSchedule` / `clearSchedule` (bound to `Pipelines`)
+
+Control the **internal** interval registered with `addPipeline({ schedule: ... })` when using the default **spawn** engine (`cds.spawn({ every })`).
+
+- **`setSchedule`**: pass `every` in **milliseconds** between delta runs. Replaces the current spawn timer if one exists, or starts one if the pipeline had no internal schedule in memory (for example you registered without `schedule` and add it only here — note: in-memory; process restart re-applies `addPipeline` from code only).
+- **`clearSchedule`**: stops the spawn `setInterval` and clears the in-process schedule. **Not supported** for pipelines registered with `schedule.engine: 'queued'`; change those by adjusting config and restarting.
+
+```http
+POST /pipeline/Pipelines('ReplicatedPartners')/DataPipelineManagementService.setSchedule
+Content-Type: application/json
+
+{ "every": 600000 }
+```
+
+```http
+POST /pipeline/Pipelines('ReplicatedPartners')/DataPipelineManagementService.clearSchedule
+Content-Type: application/json
+
+{}
+```
+
+Fiori Elements: the plugin’s [`monitor-annotations.cds`](../../srv/monitor-annotations.cds) adds **Set internal schedule** and **Clear internal schedule** to the `Pipelines` identification (list and object page).
 
 ### `execute`
 

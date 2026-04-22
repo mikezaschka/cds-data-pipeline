@@ -152,7 +152,7 @@ Content-Type: application/json
 {}
 ```
 
-Fiori Elements: the plugin’s [`monitor-annotations.cds`](../../srv/monitor-annotations.cds) adds **Set internal schedule** and **Clear internal schedule** to the `Pipelines` identification (list and object page).
+Fiori Elements: the plugin’s [`srv/monitor-annotations.cds`](https://github.com/mikezaschka/cds-data-pipeline/blob/main/srv/monitor-annotations.cds) adds **Set internal schedule** and **Clear internal schedule** to the `Pipelines` identification (list and object page).
 
 ### `execute`
 

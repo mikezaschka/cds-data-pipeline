@@ -1,8 +1,19 @@
 using from 'cds-data-pipeline/db';
+using { ProviderService } from '../../provider/srv/provider-service';
 
 namespace consumer;
 
 using { plugin.data_pipeline.sourced } from 'cds-data-pipeline/db';
+
+/** Consumption view used to test CSN-inferred viewMapping (no explicit viewMapping in addPipeline). */
+@cds.persistence.table
+entity InferredViewProducts as projection on ProviderService.Products {
+    ID       as productId,
+    name     as productName,
+    category,
+    price    as unitPrice,
+    currency,
+};
 
 entity ReplicatedCustomers {
     key ID         : String(10);

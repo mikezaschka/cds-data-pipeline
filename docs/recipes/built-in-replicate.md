@@ -8,7 +8,7 @@ This is the "replicate" use-case label — [Concepts → Inference rules](../con
 
 ### Consumption-view target
 
-The idiomatic CAP pattern is to declare the target with a **consumption view** — a `projection on <remote.Entity>` annotated with `@cds.persistence.table`. The projection doubles as the target schema, column restriction, and rename mapping, so `addPipeline(...)` only has to name it. See [Concepts → Consumption views](../concepts/consumption-views.md) and the capire [CAP-level Data Federation guide](https://cap.cloud.sap/docs/guides/integration/data-federation).
+The idiomatic CAP pattern is to declare the target with a **consumption view** — a `projection on <remote.Entity>` annotated with `@cds.persistence.table`. The projection defines the target schema, column restriction, renames, and optional static `where`. At `addPipeline` time, **`viewMapping` is inferred** from that projection when you omit it (same extraction idea as `cds-data-federation`). See [Concepts → Consumption views](../concepts/consumption-views.md) and the capire [CAP-level Data Federation guide](https://cap.cloud.sap/docs/guides/integration/data-federation).
 
 ```cds
 using { S4 } from '../srv/external/API_BUSINESS_PARTNER';
@@ -33,24 +33,32 @@ module.exports = async () => {
         name: 'Customers',
         source: { service: 'API_BUSINESS_PARTNER', entity: 'A_BusinessPartner' },
         target: { entity: 'db.Customers' },
-
-        // Mirrors the consumption-view projection above — column restriction
-        // and rename mapping in one place. Drop this block and the default
-        // MAP handler copies records verbatim (fields must then match 1:1).
-        viewMapping: {
-            isWildcard: false,
-            projectedColumns: ['BusinessPartner', 'PersonFullName', 'LastChangeDate'],
-            remoteToLocal: {
-                BusinessPartner: 'ID',
-                PersonFullName:  'Name',
-                LastChangeDate:  'modifiedAt',
-            },
-        },
-
-        delta: { field: 'modifiedAt', mode: 'timestamp' },
+        // viewMapping omitted — inferred from the consumption view on db.Customers
+        delta: { field: 'LastChangeDate', mode: 'timestamp' },
         schedule: 600000, // every 10 minutes
     });
 };
+```
+
+`delta.field` is the **remote** watermark field. To duplicate the mapping in code (optional):
+
+```javascript
+await pipelines.addPipeline({
+    name: 'Customers',
+    source: { service: 'API_BUSINESS_PARTNER', entity: 'A_BusinessPartner' },
+    target: { entity: 'db.Customers' },
+    viewMapping: {
+        isWildcard: false,
+        projectedColumns: ['BusinessPartner', 'PersonFullName', 'LastChangeDate'],
+        remoteToLocal: {
+            BusinessPartner: 'ID',
+            PersonFullName:  'Name',
+            LastChangeDate:  'modifiedAt',
+        },
+    },
+    delta: { field: 'LastChangeDate', mode: 'timestamp' },
+    schedule: 600000,
+});
 ```
 
 The source adapter is selected from the connected source service's kind (or an explicit `source.kind`):
@@ -100,6 +108,7 @@ The OData target adapter routes writes through CAP's remote runtime (POST / PUT 
 
 ## See also
 
+- [Concepts → Change history and pipeline replication](../concepts/change-tracking-and-pipeline.md) — `@cap-js/change-tracking` vs pipeline run semantics and DB UPSERT statistics.
 - [Concepts → Consumption views](../concepts/consumption-views.md) — modeling the target as a projection on the remote entity.
 - [Concepts → Inference rules](../concepts/inference.md).
 - [Sources → OData V2 / V4](../sources/odata.md) · [REST](../sources/rest.md) · [CQN](../sources/cqn.md).

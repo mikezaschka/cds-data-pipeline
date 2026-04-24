@@ -1,5 +1,6 @@
 const cds = require('./runtime-cds')
 const Pipeline = require('./lib/Pipeline')
+const { extractViewMappingFromEntityDef } = require('./lib/extractViewMappingFromEntity')
 
 const LOG = cds.log('cds-data-pipeline')
 
@@ -109,6 +110,7 @@ class DataPipelineService extends cds.Service {
      * matrix.
      */
     async addPipeline(config) {
+        this._inferViewMappingIfMissing(config)
         this._validateConfig(config)
         const { name } = config
         if (this.pipelines.has(name)) {
@@ -419,6 +421,23 @@ class DataPipelineService extends cds.Service {
      * Rows 1-5 are shape invariants; rows 6-8 are target-adapter capability
      * checks evaluated against the resolved `TargetAdapter.capabilities()`.
      */
+    /**
+     * When `viewMapping` is omitted, derive projected columns and renames from the
+     * target entity's CDS projection (consumption view), if present in `cds.model`.
+     * Explicit `viewMapping` (including `{}`) is left unchanged.
+     */
+    _inferViewMappingIfMissing(config) {
+        if (config.viewMapping !== undefined && config.viewMapping !== null) return
+        const targetEntity = config.target && config.target.entity
+        if (!targetEntity || !cds.model || !cds.model.definitions) return
+        const def = cds.model.definitions[targetEntity]
+        if (!def) return
+        const inferred = extractViewMappingFromEntityDef(def)
+        if (inferred != null) {
+            config.viewMapping = inferred
+        }
+    }
+
     _validateConfig(config) {
         if (!config || typeof config !== 'object') {
             throw new Error(`addPipeline requires a configuration object`)
@@ -646,11 +665,14 @@ class DataPipelineService extends cds.Service {
             },
             rest: config.rest,
             schedule: this._normalizeSchedule(config.schedule, config.name),
-            viewMapping: config.viewMapping || {
+            viewMapping: {
                 isWildcard: true,
                 projectedColumns: [],
                 localToRemote: {},
                 remoteToLocal: {},
+                excludedColumns: [],
+                staticWhere: null,
+                ...(config.viewMapping || {}),
             },
         }
 

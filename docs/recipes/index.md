@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Recipes
 
 Four ways to plug into `cds-data-pipeline`, ordered by how much code you write. Each recipe is a scenario-driven walkthrough — config, code, and the resulting run behaviour — anchored on a single plugin entry point.

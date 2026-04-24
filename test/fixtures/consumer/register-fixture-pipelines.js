@@ -55,6 +55,13 @@ const pipelines = [
         viewMapping: productViewMapping,
     },
     {
+        name: 'InferredViewProducts',
+        source: { service: 'ProviderService', entity: 'Products' },
+        target: { entity: 'consumer.InferredViewProducts' },
+        mode: 'delta',
+        delta: { mode: 'timestamp', field: 'modifiedAt' },
+    },
+    {
         name: 'ReplicatedPagedCustomers',
         source: { service: 'ProviderService', entity: 'PagedCustomers', batchSize: 100 },
         target: { entity: 'consumer.ReplicatedPagedCustomers' },

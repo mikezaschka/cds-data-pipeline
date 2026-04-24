@@ -8,7 +8,7 @@
         <f:title>
             <f:DynamicPageTitle>
                 <f:heading>
-                    <ObjectIdentifier class="fclDetailHeading sapUiNoContentPadding" title="{name}" text="{= ${description} ? ${description} : ${i18n>detailSubTitle} }" />
+                    <ObjectIdentifier class="fclDetailHeading sapUiNoContentPadding" title="{name}" />
                 </f:heading>
                 <f:content>
                     <ObjectStatus class="fclDetailStatus" text="{status}" state="{
@@ -25,7 +25,7 @@
         </f:title>
         
         <f:content>
-            <IconTabBar id="iconTabBar" class="sapUiResponsiveContentPadding">
+            <IconTabBar expandable="false" headerMode="Inline" id="iconTabBar" class="sapUiResponsiveContentPadding">
                 <items>
                     <IconTabFilter text="{i18n>overviewGroup}" key="overview" icon="sap-icon://overview">
                         <form:SimpleForm id="detailForm" maxContainerCols="2" labelSpanL="3" labelSpanM="3" columnsL="2" columnsM="1" layout="ColumnLayout" width="100%" editable="false" class="fclForm">

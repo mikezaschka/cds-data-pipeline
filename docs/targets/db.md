@@ -62,6 +62,12 @@ entity Customers as projection on S4.A_BusinessPartner {
 
 For materialize pipelines the target is a plain `@cds.persistence.table` whose columns match the `source.query` result shape.
 
+## Per-run statistics and UPSERT
+
+For `mode: 'upsert'`, `writeBatch` runs `UPSERT.into(entity).entries(records)` and the adapter currently returns **batch statistics** with every row in the batch counted as **`created`** and **`updated` as zero**, regardless of whether the key already existed. Per-run totals on `plugin.data_pipeline.PipelineRuns` and cumulative totals on `Pipelines` therefore **do not** yet distinguish a true insert from an idempotent re-upsert of the same key.
+
+A future improvement could classify rows (for example by reading existing keys for the batch before the UPSERT) and split counts accordingly; any deeper “sync audit” remains **run-attributed** (tied to the pipeline run) rather than a substitute for end-user change history. See [Concepts → Change history and pipeline replication](../concepts/change-tracking-and-pipeline.md) for the relationship to `@cap-js/change-tracking` and the intended separation of concerns.
+
 ## See also
 
 - [Targets → overview](index.md) — resolution order and the capability-gating matrix.
@@ -69,3 +75,4 @@ For materialize pipelines the target is a plain `@cds.persistence.table` whose c
 - [Concepts → Consumption views](../concepts/consumption-views.md) — the idiomatic replicate-target pattern.
 - [Recipes → Built-in replicate](../recipes/built-in-replicate.md) — worked example with a DB target.
 - [Recipes → Built-in materialize](../recipes/built-in-materialize.md) — query-shape snapshot to a DB target.
+- [Concepts → Change history and pipeline replication](../concepts/change-tracking-and-pipeline.md) — `@cap-js/change-tracking` vs pipeline runs.

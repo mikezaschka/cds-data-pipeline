@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Sources
 
 The **source** side of a pipeline owns the `PIPELINE.READ` phase. A source adapter bridges a transport-specific read (OData V4, OData V2, REST, CQN) to a uniform streaming contract the plugin consumes.

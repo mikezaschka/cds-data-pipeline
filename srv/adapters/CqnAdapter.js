@@ -1,6 +1,7 @@
 const cds = require('../runtime-cds')
 const BaseSourceAdapter = require('./BaseSourceAdapter')
 const { withRetry } = require('../lib/retry')
+const { mergeStaticWhereIntoSelect } = require('../lib/mergeStaticWhereIntoSelect')
 
 /**
  * CQN source adapter. Reads from any CAP-addressable service whose wire
@@ -50,6 +51,8 @@ class CqnAdapter extends BaseSourceAdapter {
         if (deltaFilter && Object.keys(deltaFilter).length > 0) {
             baseQuery = baseQuery.where(deltaFilter)
         }
+
+        mergeStaticWhereIntoSelect(baseQuery, viewMapping.staticWhere)
 
         const batchSize = sourceConfig.batchSize || 1000
         let skip = 0

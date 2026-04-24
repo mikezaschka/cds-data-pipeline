@@ -31,4 +31,15 @@ describe('viewMapping on addPipeline', () => {
         expect(laptop).not.toHaveProperty('stock')
         expect(laptop).not.toHaveProperty('name')
     })
+
+    it('infers the same mapping when viewMapping is omitted and target is a consumption view', async () => {
+        const srv = await getPipelineService()
+        await srv.clear('InferredViewProducts')
+        await srv.execute('InferredViewProducts', { mode: 'full', trigger: 'manual' })
+        const rows = await SELECT.from('consumer.InferredViewProducts')
+        const laptop = rows.find(p => p.productId === 'P001')
+        expect(laptop).toBeTruthy()
+        expect(laptop).not.toHaveProperty('stock')
+        expect(laptop).not.toHaveProperty('name')
+    })
 })

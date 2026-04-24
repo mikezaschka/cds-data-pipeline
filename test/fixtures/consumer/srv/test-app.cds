@@ -8,6 +8,7 @@ service TestConsumerService @(path: '/consumer') {
     entity ReplicatedCustomers        as projection on consumer.ReplicatedCustomers;
     entity ReplicatedCustomersV2    as projection on consumer.ReplicatedCustomersV2;
     entity ReplicatedProducts         as projection on consumer.ReplicatedProducts;
+    entity InferredViewProducts       as projection on consumer.InferredViewProducts;
     entity ReplicatedPagedCustomers  as projection on consumer.ReplicatedPagedCustomers;
     entity ReplicatedRestCustomers   as projection on consumer.ReplicatedRestCustomers;
     entity SourceOrders              as projection on consumer.SourceOrders;

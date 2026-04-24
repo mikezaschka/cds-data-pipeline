@@ -37,11 +37,13 @@ theme:
 
 nav:
   - Home: index.md
+  - Get started: get-started.md
   - Concepts:
       - concepts/index.md
       - Terminology: concepts/terminology.md
       - Inference rules: concepts/inference.md
       - Consumption views: concepts/consumption-views.md
+      - Change history and pipeline replication: concepts/change-tracking-and-pipeline.md
   - Sources:
       - sources/index.md
       - OData V2 / V4: sources/odata.md

@@ -62,23 +62,14 @@ entity Customers as projection on S4.A_BusinessPartner {
 } where BusinessPartnerCategory = '1';
 ```
 
-Point the pipeline's `target.entity` at this view and mirror the projection on `viewMapping`:
+Point the pipeline's `target.entity` at this view. If you **omit** `viewMapping`, the engine infers `projectedColumns` and `remoteToLocal` from the CDS projection; a static `where` on the view is AND-combined into the READ query (except when OData delta uses `datetime-fields`, which uses a string filter fragment).
 
 ```javascript
 await pipelines.addPipeline({
     name: 'Customers',
     source: { service: 'API_BUSINESS_PARTNER', entity: 'A_BusinessPartner' },
     target: { entity: 'db.Customers' },
-    viewMapping: {
-        isWildcard: false,
-        projectedColumns: ['BusinessPartner', 'PersonFullName', 'LastChangeDate'],
-        remoteToLocal: {
-            BusinessPartner: 'ID',
-            PersonFullName:  'Name',
-            LastChangeDate:  'modifiedAt',
-        },
-    },
-    delta: { mode: 'timestamp', field: 'modifiedAt' },
+    delta: { mode: 'timestamp', field: 'LastChangeDate' },
 });
 ```
 

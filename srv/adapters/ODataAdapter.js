@@ -1,6 +1,7 @@
 const cds = require('../runtime-cds')
 const BaseSourceAdapter = require('./BaseSourceAdapter')
 const { withRetry } = require('../lib/retry')
+const { mergeStaticWhereIntoSelect } = require('../lib/mergeStaticWhereIntoSelect')
 
 class ODataAdapter extends BaseSourceAdapter {
     constructor(service, config) {
@@ -26,6 +27,8 @@ class ODataAdapter extends BaseSourceAdapter {
         if (hasDelta) {
             baseQuery = baseQuery.where(deltaFilter)
         }
+
+        mergeStaticWhereIntoSelect(baseQuery, viewMapping.staticWhere)
 
         const batchSize = sourceConfig.batchSize || 1000
         let skip = 0

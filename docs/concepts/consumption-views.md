@@ -25,16 +25,29 @@ That single declaration does four jobs:
 1. **Local persistence.** `@cds.persistence.table` tells CAP to materialize the projection as a local table rather than resolving it through the remote service at query time.
 2. **Target schema.** The projected fields (`ID`, `Name`, `modifiedAt`) become the columns of the local table, so the pipeline's target entity is already defined.
 3. **Column restriction.** Only the listed fields are pulled from the remote — the pipeline uses `SELECT.from(source)` against the remote service, and CAP translates the projection's column list into `$select`.
-4. **Rename mapping.** The aliases (`BusinessPartner as ID`, `PersonFullName as Name`, …) are the source-to-target rename map. Pass them to `addPipeline(...)` as `viewMapping.remoteToLocal` so the built-in `PIPELINE.MAP_BATCH` handler can rename fields on the fly without a custom hook.
+4. **Rename mapping.** The aliases (`BusinessPartner as ID`, `PersonFullName as Name`, …) are the source-to-target rename map. At registration time, if you **omit** `viewMapping`, the engine **infers** `projectedColumns`, `remoteToLocal`, and `localToRemote` from the target entity's CDS projection (the same rules as `cds-data-federation`'s scanner). The built-in `PIPELINE.MAP_BATCH` handler still applies `remoteToLocal` on each batch. A **static** `where` on the projection is merged into the READ query for OData and CQN sources (not combined automatically with OData `delta.mode: 'datetime-fields'` string filters — use `timestamp` / `key` delta for full parity).
 
-A pipeline definition that uses the view looks like this:
+When the target is this consumption view, a minimal pipeline is enough:
 
 ```javascript
 await pipelines.addPipeline({
     name: 'Customers',
     source: { service: 'API_BUSINESS_PARTNER', entity: 'A_BusinessPartner' },
     target: { entity: 'db.Customers' },
+    delta: { mode: 'timestamp', field: 'LastChangeDate' },
+    schedule: 600000,
+});
+```
 
+`delta.field` must remain the **remote** element name (`LastChangeDate` here), not the local alias (`modifiedAt`).
+
+You can still pass **`viewMapping` explicitly** if you prefer it in code, or to override inference for edge cases:
+
+```javascript
+await pipelines.addPipeline({
+    name: 'Customers',
+    source: { service: 'API_BUSINESS_PARTNER', entity: 'A_BusinessPartner' },
+    target: { entity: 'db.Customers' },
     viewMapping: {
         isWildcard: false,
         projectedColumns: ['BusinessPartner', 'PersonFullName', 'LastChangeDate'],
@@ -44,18 +57,14 @@ await pipelines.addPipeline({
             LastChangeDate:  'modifiedAt',
         },
     },
-
-    delta: { mode: 'timestamp', field: 'modifiedAt' },
+    delta: { mode: 'timestamp', field: 'LastChangeDate' },
     schedule: 600000,
 });
 ```
 
-`viewMapping` is optional — omit it and the default `PIPELINE.MAP_BATCH` handler copies `sourceRecords` onto `targetRecords` unchanged. In that case, the remote and local schemas must line up field-for-field, which in practice means either:
+If the target is **not** a projection (plain table) and you omit `viewMapping`, the default `PIPELINE.MAP_BATCH` handler copies `sourceRecords` unchanged — remote and local element names must match, or you need a custom `PIPELINE.MAP_BATCH` hook.
 
-- A remote entity whose fields already match the target table exactly, or
-- A custom `PIPELINE.MAP_BATCH` hook that does the translation imperatively.
-
-Consumption views give you the third, declarative option — **say what the local shape should be, once, in CDS**, and let the plugin map records into that shape.
+Consumption views give you the declarative option — **say what the local shape should be, once, in CDS**, and let the plugin infer mapping and apply it at runtime.
 
 ## Where consumption views fit the plugin entry points
 

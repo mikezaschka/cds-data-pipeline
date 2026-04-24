@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Concepts
 
 The small vocabulary `cds-data-pipeline` is built on. These pages cover the pieces of `addPipeline(...)`, what the plugin infers from your config, and the event namespace every pipeline exposes.
@@ -32,5 +27,13 @@ The small vocabulary `cds-data-pipeline` is built on. These pages cover the piec
     The idiomatic CAP pattern for shaping a replicate target — a `projection on <remote.Entity>` that declares target schema, column restriction, and rename mapping in one place.
 
     [:octicons-arrow-right-24: Consumption views](consumption-views.md)
+
+-   :material-history: **Change history and pipelines**
+
+    ---
+
+    How `@cap-js/change-tracking` relates to pipeline-filled tables, per-run `PipelineRuns` statistics, and user-edited local enrichment data.
+
+    [:octicons-arrow-right-24: Change history and pipeline replication](change-tracking-and-pipeline.md)
 
 </div>

@@ -26,3 +26,12 @@ if (process.env.CDS_PIPELINE_TEST_CONSUMER === 'true') {
         if (e.code !== 'MODULE_NOT_FOUND') throw e
     }
 }
+
+// `cds add data-pipeline-monitor` — `global.cds.add` only exists for `cds add` (cds-dk); skip otherwise.
+if (global.cds.add?.register) {
+    try {
+        global.cds.add.register('data-pipeline-monitor', require('./lib/add-data-pipeline-monitor'))
+    } catch (e) {
+        if (e?.code !== 'MODULE_NOT_FOUND') throw e
+    }
+}

@@ -25,6 +25,8 @@
     "srv/**",
     "db/**",
     "scripts/**",
+    "lib/**",
+    "app/pipeline-console/**",
     "cds-plugin.js",
     "README.md"
   ],
@@ -35,6 +37,8 @@
     "test/fixtures/rest-provider"
   ],
   "scripts": {
+    "build:app-pipeline-console": "cd examples/_ui-pipeline/pipeline-console && npx ui5 build self-contained --clean-dest --dest ../../../app/pipeline-console && find ../../../app/pipeline-console -name '*.ts' -delete",
+    "prepublishOnly": "npm run build:app-pipeline-console",
     "pretest": "npm install --silent",
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand test/unit",
@@ -45,6 +49,7 @@
   },
   "devDependencies": {
     "@cap-js/cds-test": "^0.4.1",
+    "@sap/cds-dk": "^9",
     "@cap-js/mcp-server": "^0.0.4",
     "@sap-ux/fiori-mcp-server": "^0.6.49",
     "@sap/cds": "^9",
@@ -63,7 +68,13 @@
     }
   },
   "peerDependencies": {
-    "@sap/cds": ">=9.2.0"
+    "@sap/cds": ">=9.2.0",
+    "@sap/cds-dk": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "@sap/cds-dk": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22"

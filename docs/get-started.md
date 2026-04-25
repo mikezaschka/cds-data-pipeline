@@ -124,13 +124,20 @@ Expose `LocalProducts` on an application service if you want to query it over OD
 
 ## 6. Open the monitor
 
-!!! note "Scaffold command (planned)"
-    A **`cds add data-pipeline-monitor`** command is intended to copy or generate the pipeline monitor UI into your project. It is **not implemented yet**; treat the steps below as the current options.
+**Scaffold** (requires `@sap/cds-dk` so the `cds add` CLI is available): from your project root, with `cds-data-pipeline` already a dependency, run:
 
-**Without that command, you can:**
+```bash
+cds add data-pipeline-monitor
+```
+
+That copies the pre-built **Pipeline Console** (freestyle FCL UI) into `app/pipeline-console`, adds a `pipeline-console` devDependency and [cds-plugin-ui5](https://github.com/ui5-community/ui5-ecosystem-showcase/tree/main/packages/cds-plugin-ui5) configuration (default mount: `/pipeline-console`). A future version may ship the Fiori **Pipeline Monitor** list report under the same command; today the console is the scaffolded UI.
+
+Then run `npm install` and `cds watch`, and open `/pipeline-console/index.html` (or your launchpad) on the same origin as the CAP server.
+
+**Without the scaffold, you can:**
 
 - Use the **management OData API** directly, for example `GET /pipeline/Pipelines` and `GET /pipeline/PipelineRuns`. See [Management Service](reference/management-service.md).
-- Reuse the **reference UI** in this repository: build the shared UI5 apps under `examples/_ui-pipeline` and mount them with [cds-plugin-ui5](https://github.com/ui5-community/ui5-ecosystem-showcase/tree/main/packages/cds-plugin-ui5), as in [examples/01-replicate-odata](https://github.com/mikezaschka/cds-data-pipeline/tree/main/examples/01-replicate-odata) (`pipeline-monitor` at `/pipeline-monitor`).
+- Reuse the **reference UI** in this repository: build the shared UI5 apps under `examples/_ui-pipeline` and mount them with cds-plugin-ui5, as in [examples/01-replicate-odata](https://github.com/mikezaschka/cds-data-pipeline/tree/main/examples/01-replicate-odata) (`pipeline-monitor` at `/pipeline-monitor`, `pipeline-console` at `/pipeline-console`).
 
 ## 7. Query the service and check the data
 

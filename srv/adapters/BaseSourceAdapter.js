@@ -64,7 +64,7 @@ const cds = require('../runtime-cds')
  *    'odata-v2' | 'rest'`, or rely on `cds.requires.<svc>.kind` for
  *    annotation-wired pipelines.
  *
- * See `docs/sources/custom.md` for a worked example.
+ * See `docs/guide/sources/custom.md` for a worked example.
  */
 class BaseSourceAdapter {
     /**

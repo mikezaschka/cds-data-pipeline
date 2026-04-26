@@ -23,41 +23,13 @@ One source adapter is resolved per pipeline at registration time.
 | `cqn` / `postgres` / `hana` / `sqlite` / `better-sqlite` / in-process CAP services | `CqnAdapter` | [CQN](cqn.md) |
 | Anything else | Register a [custom source adapter](custom.md) |  |
 
-<div class="grid cards" markdown>
+- **[OData V2 / V4](odata.md)** — CAP-native CQN translation. All three delta modes (`timestamp`, `key`, `datetime-fields`), server-driven paging, consumption-view column restriction.
 
--   :material-api: **OData V2 / V4**
+- **[REST](rest.md)** — Plain JSON over HTTP — no CDS model. Cursor / offset / page pagination, configurable delta URL parameter, nested-response extraction via `dataPath`.
 
-    ---
+- **[CQN](cqn.md)** — In-process CAP services and `cds.requires` DB bindings (`postgres`, `hana`, `sqlite`, …). Serves both entity-shape and query-shape reads.
 
-    CAP-native CQN translation. All three delta modes (`timestamp`, `key`, `datetime-fields`), server-driven paging, consumption-view column restriction.
-
-    [:octicons-arrow-right-24: OData V2 / V4](odata.md)
-
--   :material-web: **REST**
-
-    ---
-
-    Plain JSON over HTTP — no CDS model. Cursor / offset / page pagination, configurable delta URL parameter, nested-response extraction via `dataPath`.
-
-    [:octicons-arrow-right-24: REST](rest.md)
-
--   :material-database-search: **CQN**
-
-    ---
-
-    In-process CAP services and `cds.requires` DB bindings (`postgres`, `hana`, `sqlite`, …). Serves both entity-shape and query-shape reads.
-
-    [:octicons-arrow-right-24: CQN](cqn.md)
-
--   :material-puzzle: **Custom source adapter**
-
-    ---
-
-    Extend `BaseSourceAdapter` to read from a transport the plugin does not ship. Worked example: a CSV-file source adapter.
-
-    [:octicons-arrow-right-24: Custom source adapter](custom.md)
-
-</div>
+- **[Custom source adapter](custom.md)** — Extend `BaseSourceAdapter` to read from a transport the plugin does not ship. Worked example: a CSV-file source adapter.
 
 ## Delta strategies
 

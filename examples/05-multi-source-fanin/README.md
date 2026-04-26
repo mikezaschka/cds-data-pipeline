@@ -1,6 +1,6 @@
 # Example 05 — Multi-source fan-in
 
-**What this shows:** consolidate the same logical entity from N backends into one local table, stamping each row with the backend it came from. Per-origin flush and `mode: 'full'` refreshes leave sibling origins untouched. See [docs/recipes/multi-source.md](../../docs/recipes/multi-source.md).
+**What this shows:** consolidate the same logical entity from N backends into one local table, stamping each row with the backend it came from. Per-origin flush and `mode: 'full'` refreshes leave sibling origins untouched. See [docs/guide/recipes/multi-source.md](../../docs/guide/recipes/multi-source.md).
 
 **Sources:** two LogisticsService instances with distinct seed data — DEV on `:4455`, PROD on `:4465`. Both are the same `_providers/logistics-service` package running with `LOGISTICS_ORIGIN=DEV` / `LOGISTICS_ORIGIN=PROD`; a `cds.on('served')` hook in the provider swaps in origin-specific `Shipments` rows.
 
@@ -94,6 +94,6 @@ Walk through `http/10-run-and-query.http`:
 
 ## See also
 
-- [Recipes → Multi-source](../../docs/recipes/multi-source.md) — the reference walkthrough.
-- [Concepts → Inference rules](../../docs/concepts/inference.md) — where `origin` fits in the pipeline-kind table.
+- [Recipes → Multi-source](../../docs/guide/recipes/multi-source.md) — the reference walkthrough.
+- [Concepts → Inference rules](../../docs/guide/concepts/inference.md) — where `origin` fits in the pipeline-kind table.
 - [Example 01 — Replicate OData](../01-replicate-odata/) — the single-origin baseline.

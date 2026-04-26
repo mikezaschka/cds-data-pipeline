@@ -47,58 +47,59 @@ Derived / aggregated snapshot. The closure `source.query(tracker)` receives the 
 
 `source.query` can be written in either CAP style — the fluent builder or `cds.ql` tagged templates. Both produce the same SELECT that the source service can run. See the official CAP references: [CQL (Core Query Language)](https://cap.cloud.sap/docs/cds/cql), [CQN (Core Query Notation)](https://cap.cloud.sap/docs/cds/cqn), and [`cds.ql`](https://cap.cloud.sap/docs/node.js/cds-ql).
 
-=== "Fluent builder"
+::: code-group
 
-    ```javascript
-    await pipelines.addPipeline({
-        name: 'DailyCustomerRevenue',
-        schedule: '0 2 * * *',                              // nightly at 02:00
-        source: {
-            kind: 'cqn',
-            service: 'SalesService',
-            query: () => SELECT
-                .from('SalesService.Orders')
-                .columns(
-                    'customer_id as customerID',
-                    { func: 'sum',   args: [{ ref: ['amount'] }],     as: 'totalAmount' },
-                    { func: 'count', args: ['*'],                     as: 'orderCount'  },
-                    { func: 'max',   args: [{ ref: ['modifiedAt'] }], as: 'lastActivity' },
-                )
-                .where({ status: 'completed' })
-                .groupBy('customer_id'),
-        },
-        target: { entity: 'reporting.DailyCustomerRevenue' },
-        refresh: 'full',                                    // default
-    });
-    ```
+```javascript [Fluent builder]
+await pipelines.addPipeline({
+    name: 'DailyCustomerRevenue',
+    schedule: '0 2 * * *',                              // nightly at 02:00
+    source: {
+        kind: 'cqn',
+        service: 'SalesService',
+        query: () => SELECT
+            .from('SalesService.Orders')
+            .columns(
+                'customer_id as customerID',
+                { func: 'sum',   args: [{ ref: ['amount'] }],     as: 'totalAmount' },
+                { func: 'count', args: ['*'],                     as: 'orderCount'  },
+                { func: 'max',   args: [{ ref: ['modifiedAt'] }], as: 'lastActivity' },
+            )
+            .where({ status: 'completed' })
+            .groupBy('customer_id'),
+    },
+    target: { entity: 'reporting.DailyCustomerRevenue' },
+    refresh: 'full',                                    // default
+});
+```
 
-=== "`cds.ql` tagged templates"
+```javascript [`cds.ql` tagged templates]
+await pipelines.addPipeline({
+    name: 'DailyCustomerRevenue',
+    schedule: '0 2 * * *',                              // nightly at 02:00
+    source: {
+        kind: 'cqn',
+        service: 'SalesService',
+        query: () => SELECT `
+            customer_id     as customerID,
+            sum(amount)     as totalAmount,
+            count(*)        as orderCount,
+            max(modifiedAt) as lastActivity
+        ` .from `SalesService.Orders`
+          .where `status = 'completed'`
+          .groupBy `customer_id`,
+    },
+    target: { entity: 'reporting.DailyCustomerRevenue' },
+    refresh: 'full',                                    // default
+});
+```
 
-    ```javascript
-    await pipelines.addPipeline({
-        name: 'DailyCustomerRevenue',
-        schedule: '0 2 * * *',                              // nightly at 02:00
-        source: {
-            kind: 'cqn',
-            service: 'SalesService',
-            query: () => SELECT `
-                customer_id     as customerID,
-                sum(amount)     as totalAmount,
-                count(*)        as orderCount,
-                max(modifiedAt) as lastActivity
-            ` .from `SalesService.Orders`
-              .where `status = 'completed'`
-              .groupBy `customer_id`,
-        },
-        target: { entity: 'reporting.DailyCustomerRevenue' },
-        refresh: 'full',                                    // default
-    });
-    ```
+:::
 
 The presence of `source.query` marks this pipeline as query-shape. The inferred defaults are `mode: 'full'` and `delta.mode: 'full'`.
 
-!!! warning "Don't `await` the query inside the closure"
-    `cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the pipeline runs the SELECT against the configured source service.
+::: warning Don't `await` the query inside the closure
+`cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the pipeline runs the SELECT against the configured source service.
+:::
 
 Tagged templates are especially convenient when the query depends on the tracker — `${...}` values are safely parameterized by CAP:
 
@@ -147,7 +148,7 @@ No new auth path. The adapter uses `cds.requires[source.service]` exactly like t
 - [Recipes → Built-in materialize](../recipes/built-in-materialize.md) — worked `DailyCustomerRevenue` example end-to-end.
 - [Sources → OData V2 / V4](odata.md) — OData-specific adapter.
 - [Sources → REST Adapter](rest.md) — REST-specific adapter.
-- [Reference → Management Service](../reference/management-service.md) — programmatic `addPipeline` API.
+- [Reference → Management Service](../../reference/management-service.md) — programmatic `addPipeline` API.
 - [capire → CQL (Core Query Language)](https://cap.cloud.sap/docs/cds/cql) — CDS query language reference.
 - [capire → CQN (Core Query Notation)](https://cap.cloud.sap/docs/cds/cqn) — JSON shape that `source.query` must ultimately return.
 - [capire → Node.js `cds.ql`](https://cap.cloud.sap/docs/node.js/cds-ql) — `SELECT` builder, tagged-template form, and parameter interpolation.

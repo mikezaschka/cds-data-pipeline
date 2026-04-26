@@ -22,33 +22,11 @@ Every write is dispatched through the resolved target adapter. Non-`db` targets 
 | `ODataTargetAdapter` | `target.kind` is `'odata' / 'odata-v2'`, or the connected service advertises that kind | `batchInsert`, `keyAddressableUpsert`, `batchDelete`, `truncate` | [OData](odata.md) |
 | Any other transport | Register a [custom target adapter](custom.md) | Whatever the adapter advertises |  |
 
-<div class="grid cards" markdown>
+- **[Local DB](db.md)** — The default. Resolved automatically when `target.service` is unset or `'db'`. Writes `UPSERT` / `INSERT` / `DELETE` via CAP's `cds.connect.to('db')`.
 
--   :material-database: **Local DB**
+- **[OData](odata.md)** — Forward writes to a remote OData V2 / V4 service through CAP's remote runtime — `UPSERT.entries(...)` → POST / PUT / PATCH, with `$batch` change sets where the provider supports them.
 
-    ---
-
-    The default. Resolved automatically when `target.service` is unset or `'db'`. Writes `UPSERT` / `INSERT` / `DELETE` via CAP's `cds.connect.to('db')`.
-
-    [:octicons-arrow-right-24: Local DB](db.md)
-
--   :material-cloud-upload: **OData**
-
-    ---
-
-    Forward writes to a remote OData V2 / V4 service through CAP's remote runtime — `UPSERT.entries(...)` → POST / PUT / PATCH, with `$batch` change sets where the provider supports them.
-
-    [:octicons-arrow-right-24: OData](odata.md)
-
--   :material-puzzle: **Custom target adapter**
-
-    ---
-
-    Extend `BaseTargetAdapter` for non-db, non-OData destinations (message buses, custom HTTP APIs, …). Worked example: a reporting service over `srv.send()`.
-
-    [:octicons-arrow-right-24: Custom target adapter](custom.md)
-
-</div>
+- **[Custom target adapter](custom.md)** — Extend `BaseTargetAdapter` for non-db, non-OData destinations (message buses, custom HTTP APIs, …). Worked example: a reporting service over `srv.send()`.
 
 ## Capability gating
 

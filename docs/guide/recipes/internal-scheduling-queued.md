@@ -4,8 +4,9 @@
 
 The queued engine is backed by CAP's persistent task queue: the schedule message is stored in `cds.outbox.Messages` and dispatched exactly once per interval.
 
-!!! warning "Alpha API"
-    The underlying `.schedule()` / `.every()` API is marked experimental in the [CAP task scheduling docs](https://cap.cloud.sap/docs/node.js/queue#task-scheduling). Semantics may still change. For workloads that can't absorb churn, prefer the default `spawn` engine or an external trigger.
+::: warning Alpha API
+The underlying `.schedule()` / `.every()` API is marked experimental in the [CAP task scheduling docs](https://cap.cloud.sap/docs/node.js/queue#task-scheduling). Semantics may still change. For workloads that can't absorb churn, prefer the default `spawn` engine or an external trigger.
+:::
 
 ## Engines at a glance
 
@@ -102,5 +103,5 @@ The returned envelope omits `done` because the run may execute on another instan
 ## See also
 
 - [External scheduling with SAP BTP Job Scheduling Service](external-scheduling-jss.md) — when centralized BTP-native cron is the better fit.
-- [Reference → Management Service](../reference/management-service.md) — the `execute` action JSS and scripts call, plus the `RunTrigger` enum.
+- [Reference → Management Service](../../reference/management-service.md) — the `execute` action JSS and scripts call, plus the `RunTrigger` enum.
 - [CAP docs: Queueing with `cds.queued`](https://cap.cloud.sap/docs/node.js/queue) — task queue configuration (`maxAttempts`, `timeout`, `legacyLocking`, ...).

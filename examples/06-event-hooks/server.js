@@ -42,7 +42,7 @@ cds.on('served', async () => {
     // Inject or override source config before the default `on` resolves
     // the adapter. Here we demonstrate tweaking the delta watermark for
     // a one-shot replay when an env var is set. Normally you'd leave
-    // READ alone; see docs/recipes/event-hooks.md for the wrap-stream
+    // READ alone; see docs/guide/recipes/event-hooks.md for the wrap-stream
     // pattern that uses `after('PIPELINE.READ', ...)` instead.
     pipelines.before('PIPELINE.READ', 'Shipments', (req) => {
         const replayFrom = process.env.REPLAY_FROM

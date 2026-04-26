@@ -28,74 +28,75 @@ entity DailyCustomerRevenue {
 
 `source.query` is a closure that returns a CQN SELECT. You can write it in either of the two styles CAP supports — the fluent builder (`SELECT.from(...).columns(...)`) or `cds.ql` tagged templates — and mix them where one reads better than the other. Both produce the same CQN and flow through the CQN adapter identically (see the official [CQL reference](https://cap.cloud.sap/docs/cds/cql) and [CQN notation](https://cap.cloud.sap/docs/cds/cqn)).
 
-=== "Fluent builder"
+::: code-group
 
-    ```javascript
-    const cds = require('@sap/cds');
+```javascript [Fluent builder]
+const cds = require('@sap/cds');
 
-    module.exports = async () => {
-        const pipelines = await cds.connect.to('DataPipelineService');
+module.exports = async () => {
+    const pipelines = await cds.connect.to('DataPipelineService');
 
-        await pipelines.addPipeline({
-            name: 'DailyCustomerRevenue',
-            schedule: '0 2 * * *',                              // nightly at 02:00
+    await pipelines.addPipeline({
+        name: 'DailyCustomerRevenue',
+        schedule: '0 2 * * *',                              // nightly at 02:00
 
-            source: {
-                kind: 'cqn',
-                service: 'SalesService',
-                query: () => SELECT
-                    .from('SalesService.Orders')
-                    .columns(
-                        'customer_id as customerId',
-                        { func: 'sum',   args: [{ ref: ['amount'] }],     as: 'totalAmount' },
-                        { func: 'count', args: ['*'],                     as: 'orderCount'  },
-                        { func: 'max',   args: [{ ref: ['modifiedAt'] }], as: 'lastActivity' },
-                    )
-                    .where({ status: 'completed' })
-                    .groupBy('customer_id'),
-            },
+        source: {
+            kind: 'cqn',
+            service: 'SalesService',
+            query: () => SELECT
+                .from('SalesService.Orders')
+                .columns(
+                    'customer_id as customerId',
+                    { func: 'sum',   args: [{ ref: ['amount'] }],     as: 'totalAmount' },
+                    { func: 'count', args: ['*'],                     as: 'orderCount'  },
+                    { func: 'max',   args: [{ ref: ['modifiedAt'] }], as: 'lastActivity' },
+                )
+                .where({ status: 'completed' })
+                .groupBy('customer_id'),
+        },
 
-            target: { entity: 'reporting.DailyCustomerRevenue' },
-            refresh: 'full',
-        });
-    };
-    ```
+        target: { entity: 'reporting.DailyCustomerRevenue' },
+        refresh: 'full',
+    });
+};
+```
 
-=== "`cds.ql` tagged templates"
+```javascript [`cds.ql` tagged templates]
+const cds = require('@sap/cds');
 
-    ```javascript
-    const cds = require('@sap/cds');
+module.exports = async () => {
+    const pipelines = await cds.connect.to('DataPipelineService');
 
-    module.exports = async () => {
-        const pipelines = await cds.connect.to('DataPipelineService');
+    await pipelines.addPipeline({
+        name: 'DailyCustomerRevenue',
+        schedule: '0 2 * * *',                              // nightly at 02:00
 
-        await pipelines.addPipeline({
-            name: 'DailyCustomerRevenue',
-            schedule: '0 2 * * *',                              // nightly at 02:00
+        source: {
+            kind: 'cqn',
+            service: 'SalesService',
+            query: () => SELECT `
+                customer_id     as customerId,
+                sum(amount)     as totalAmount,
+                count(*)        as orderCount,
+                max(modifiedAt) as lastActivity
+            ` .from `SalesService.Orders`
+              .where `status = 'completed'`
+              .groupBy `customer_id`,
+        },
 
-            source: {
-                kind: 'cqn',
-                service: 'SalesService',
-                query: () => SELECT `
-                    customer_id     as customerId,
-                    sum(amount)     as totalAmount,
-                    count(*)        as orderCount,
-                    max(modifiedAt) as lastActivity
-                ` .from `SalesService.Orders`
-                  .where `status = 'completed'`
-                  .groupBy `customer_id`,
-            },
+        target: { entity: 'reporting.DailyCustomerRevenue' },
+        refresh: 'full',
+    });
+};
+```
 
-            target: { entity: 'reporting.DailyCustomerRevenue' },
-            refresh: 'full',
-        });
-    };
-    ```
+:::
 
 The presence of `source.query` marks this as a query-shape (snapshot-write) pipeline; `mode: 'full'` and `delta.mode: 'full'` are the inferred defaults. Snapshot writes require a target adapter that supports `batchInsert` — the default `DbTargetAdapter` does.
 
-!!! warning "Don't `await` the query inside the closure"
-    `cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the SELECT runs against the configured source service.
+::: warning Don't `await` the query inside the closure
+`cds.ql` builders are *thenable* — `await`ing one executes it against the ambient `cds.context` and returns rows, not a CQN. Keep `source.query` a plain (non-`async`) closure that *returns* the builder; the SELECT runs against the configured source service.
+:::
 
 ### Interpolating the tracker watermark
 
@@ -154,8 +155,8 @@ All standard pipeline hooks (`PIPELINE.START`, `PIPELINE.READ`, `PIPELINE.MAP_BA
 - [Concepts → Inference rules](../concepts/inference.md) — the full shape-to-behavior table.
 - [Sources → CQN adapter](../sources/cqn.md) — adapter reference covering both shapes.
 - [Targets → Local DB](../targets/db.md) — where the snapshot lands.
-- [Reference → Management Service](../reference/management-service.md) — triggering and inspecting runs.
-- [Reference → Features](../reference/features.md) — full capability overview.
+- [Reference → Management Service](../../reference/management-service.md) — triggering and inspecting runs.
+- [Reference → Features](../../reference/features.md) — full capability overview.
 - [capire → CQL (Core Query Language)](https://cap.cloud.sap/docs/cds/cql) — CDS query language reference.
 - [capire → CQN (Core Query Notation)](https://cap.cloud.sap/docs/cds/cqn) — JSON shape that `source.query` must ultimately return.
 - [capire → Node.js `cds.ql`](https://cap.cloud.sap/docs/node.js/cds-ql) — `SELECT` builder, tagged-template form, and parameter interpolation.

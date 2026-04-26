@@ -179,7 +179,7 @@ Send `Authorization` (or any other headers your deployment expects) if you confi
 | `trigger` | no | `manual` | Recorded as the `trigger` column on `PipelineRuns`. Whitelisted to the `RunTrigger` enum values. Use `external` for runs fired by an external scheduler so the run history is attributed correctly. |
 | `async` | no | `false` | If `true`, the run is dispatched asynchronously (via `cds.spawn`) and the action returns `202 Accepted` immediately. Use this when the pipeline may exceed the caller's HTTP response window (JSS has a fixed timeout). Errors during the async run still land in `PipelineRuns`. |
 
-See the external-trigger walkthrough at [Recipes → External scheduling with SAP BTP Job Scheduling Service](../recipes/external-scheduling-jss.md).
+See the external-trigger walkthrough at [Recipes → External scheduling with SAP BTP Job Scheduling Service](../guide/recipes/external-scheduling-jss.md).
 
 ### `flush`
 
@@ -287,14 +287,16 @@ Five events fire per run:
 
 Hooks register via the standard CAP API: `srv.before/on/after(event, pipelineName, handler)`. `PIPELINE.START` and `PIPELINE.DONE` have no built-in default handler — use `on` / `before` / `after` freely. `after('PIPELINE.DONE', name, handler)` is the canonical hook for end-of-run notifications and works uniformly for sync, async-spawn, async-queued, and scheduled runs.
 
-!!! note "Signature convention"
-    Per CAP convention: `before` and `on` hooks receive `(req)`; `after` hooks receive `(results, req)`. For non-READ events `results` is usually `undefined`, so `after` hooks should read and mutate state on the second argument (`req.data`).
+::: info Signature convention
+Per CAP convention: `before` and `on` hooks receive `(req)`; `after` hooks receive `(results, req)`. For non-READ events `results` is usually `undefined`, so `after` hooks should read and mutate state on the second argument (`req.data`).
+:::
 
-!!! note "Ordering"
-    Multiple hooks for the same `(event, path)` run in parallel. For sequential ordering, register with `srv.prepend(() => srv.before(...))`.
+::: info Ordering
+Multiple hooks for the same `(event, path)` run in parallel. For sequential ordering, register with `srv.prepend(() => srv.before(...))`.
+:::
 
 ## See also
 
 - [Reference → Features](features.md) — consumer-facing capability overview.
-- [Concepts → Terminology](../concepts/terminology.md) — the event namespace and tracker primitives.
-- [Concepts → Inference rules](../concepts/inference.md) — how `addPipeline(...)` derives behavior from the config shape.
+- [Concepts → Terminology](../guide/concepts/terminology.md) — the event namespace and tracker primitives.
+- [Concepts → Inference rules](../guide/concepts/inference.md) — how `addPipeline(...)` derives behavior from the config shape.

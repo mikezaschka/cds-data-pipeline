@@ -9,7 +9,7 @@ These concerns are **orthogonal**:
 
 After a replicate run, rows in the target table match the remote slice you defined (consumption view, delta mode). Local **enrichment** columns (fields not overwritten by the pipeline’s UPSERT strategy) can still be edited by users; keep pipeline mapping and delta configuration aligned with what you want to preserve vs overwrite.
 
-For pipeline observability, use the [Management Service](../reference/management-service.md) and [Features → Observability](../reference/features.md#observability) rather than treating `PipelineRuns` statistics as a substitute for `@cap-js/change-tracking`.
+For pipeline observability, use the [Management Service](../../reference/management-service.md) and [Features → Observability](../../reference/features.md#observability) rather than treating `PipelineRuns` statistics as a substitute for `@cap-js/change-tracking`.
 
 ## See also
 

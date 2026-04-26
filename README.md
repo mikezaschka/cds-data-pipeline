@@ -8,16 +8,16 @@
 
 ## What this is
 
-- A programmatic `addPipeline({ name, source, target, mode, delta, schedule, ... })` API that registers one pipeline per call. Behaviour is [inferred from the config shape](https://mikezaschka.github.io/cds-data-pipeline/concepts/inference/).
+- A programmatic `addPipeline({ name, source, target, mode, delta, schedule, ... })` API that registers one pipeline per call. Behaviour is [inferred from the config shape](https://mikezaschka.github.io/cds-data-pipeline/guide/concepts/inference.html).
 - A `cds.Service` (`DataPipelineService`) routing `PIPELINE.START` → `PIPELINE.READ` → (`PIPELINE.MAP_BATCH` → `PIPELINE.WRITE_BATCH`)\* → `PIPELINE.DONE` events, with hook registration via the standard `srv.before / on / after(event, pipelineName, handler)` API.
-- A persisted tracker (`Pipelines`, `PipelineRuns`) + [management OData service](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/) at `/pipeline` (`DataPipelineManagementService`).
-- Source adapters: [OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/sources/odata/), [REST](https://mikezaschka.github.io/cds-data-pipeline/sources/rest/) (offset / cursor / page pagination), [CQN](https://mikezaschka.github.io/cds-data-pipeline/sources/cqn/) (in-process CAP services and CQN-native DB bindings), pluggable [`BaseSourceAdapter`](https://mikezaschka.github.io/cds-data-pipeline/sources/custom/).
-- Target adapters: [`DbTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/db/) (local DB) and [`ODataTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/odata/) (remote OData V2 / V4 via CAP's connected service) shipped in-box; pluggable [`BaseTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/custom/) for everything else.
+- A persisted tracker (`Pipelines`, `PipelineRuns`) + [management OData service](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service.html) at `/pipeline` (`DataPipelineManagementService`).
+- Source adapters: [OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/odata.html), [REST](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/rest.html) (offset / cursor / page pagination), [CQN](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/cqn.html) (in-process CAP services and CQN-native DB bindings), pluggable [`BaseSourceAdapter`](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/custom.html).
+- Target adapters: [`DbTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/guide/targets/db.html) (local DB) and [`ODataTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/guide/targets/odata.html) (remote OData V2 / V4 via CAP's connected service) shipped in-box; pluggable [`BaseTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/guide/targets/custom.html) for everything else.
 - Resilience primitives: retry with exponential backoff and a concurrency guard on the tracker.
 
 ## What this isn't
 
-- **Not a DAG runner.** Each `addPipeline(...)` call wires one source to one target — pipelines never chain, compose, or fan out internally. "Fan-in" in the DAG sense (one call merging multiple sources in-process) is out of scope; consolidating the same logical entity from N backends into one target table **is** supported by registering N sibling pipelines and stamping a `source.origin` label into a shared `source` key column — see [Recipes → Multi-source fan-in](https://mikezaschka.github.io/cds-data-pipeline/recipes/multi-source/).
+- **Not a DAG runner.** Each `addPipeline(...)` call wires one source to one target — pipelines never chain, compose, or fan out internally. "Fan-in" in the DAG sense (one call merging multiple sources in-process) is out of scope; consolidating the same logical entity from N backends into one target table **is** supported by registering N sibling pipelines and stamping a `source.origin` label into a shared `source` key column — see [Recipes → Multi-source fan-in](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/multi-source.html).
 - **Not an ETL engine.** No multi-source joins inside the pipeline.
 - **Not a transformation DSL.** Field renames happen in the `MAP` event hook (or via the caller-supplied `viewMapping.remoteToLocal`). Anything more complex is application code.
 - **Not an iPaaS.** No visual modeler, no adapter marketplace, no cross-tenant control plane.
@@ -26,29 +26,29 @@
 
 ## Use cases
 
-Common combinations of read shape and target destination. These are **doc-level labels**, not a field on `addPipeline(...)` and not a column on the tracker. See the [Inference rules](https://mikezaschka.github.io/cds-data-pipeline/concepts/inference/) for the full table.
+Common combinations of read shape and target destination. These are **doc-level labels**, not a field on `addPipeline(...)` and not a column on the tracker. See the [Inference rules](https://mikezaschka.github.io/cds-data-pipeline/guide/concepts/inference.html) for the full table.
 
 | Use case | What it does | Recipe |
 |---|---|---|
-| **Replicate** | Entity-shape read, row-preserving copy into a local DB target — one source row → one target row (possibly filtered, projected, renamed). | [Built-in replicate](https://mikezaschka.github.io/cds-data-pipeline/recipes/built-in-replicate/) |
-| **Materialize** | Query-shape read (`source.query`). Target derived from a SELECT CQN closure — aggregates, joins, DISTINCT, computed columns. Full refresh or scoped partial refresh via `refresh.slice`. | [Built-in materialize](https://mikezaschka.github.io/cds-data-pipeline/recipes/built-in-materialize/) |
-| **Move-to-service** | Entity-shape read into a non-`db` target. Built-in for OData targets; other transports via a [custom target adapter](https://mikezaschka.github.io/cds-data-pipeline/targets/custom/) or [event hooks](https://mikezaschka.github.io/cds-data-pipeline/recipes/event-hooks/). | [Built-in replicate → OData target](https://mikezaschka.github.io/cds-data-pipeline/recipes/built-in-replicate/#to-a-remote-odata-target) |
-| **Multi-source fan-in** | Consolidate the same logical entity from N backends into one target table via sibling pipelines, each stamping a `source.origin` label into a shared `source` key column. | [Multi-source fan-in](https://mikezaschka.github.io/cds-data-pipeline/recipes/multi-source/) |
+| **Replicate** | Entity-shape read, row-preserving copy into a local DB target — one source row → one target row (possibly filtered, projected, renamed). | [Built-in replicate](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/built-in-replicate.html) |
+| **Materialize** | Query-shape read (`source.query`). Target derived from a SELECT CQN closure — aggregates, joins, DISTINCT, computed columns. Full refresh or scoped partial refresh via `refresh.slice`. | [Built-in materialize](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/built-in-materialize.html) |
+| **Move-to-service** | Entity-shape read into a non-`db` target. Built-in for OData targets; other transports via a [custom target adapter](https://mikezaschka.github.io/cds-data-pipeline/guide/targets/custom.html) or [event hooks](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/event-hooks.html). | [Built-in replicate → OData target](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/built-in-replicate.html#to-a-remote-odata-target) |
+| **Multi-source fan-in** | Consolidate the same logical entity from N backends into one target table via sibling pipelines, each stamping a `source.origin` label into a shared `source` key column. | [Multi-source fan-in](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/multi-source.html) |
 
 ## Features
 
-A teaser of what the plugin offers. Full catalogue on the [Features reference page](https://mikezaschka.github.io/cds-data-pipeline/reference/features/).
+A teaser of what the plugin offers. Full catalogue on the [Features reference page](https://mikezaschka.github.io/cds-data-pipeline/reference/features.html).
 
-- **Source adapters** — [OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/sources/odata/), [REST](https://mikezaschka.github.io/cds-data-pipeline/sources/rest/) (cursor / offset / page pagination, `dataPath` extraction), [CQN](https://mikezaschka.github.io/cds-data-pipeline/sources/cqn/) (in-process CAP services and DB bindings), plus a pluggable [`BaseSourceAdapter`](https://mikezaschka.github.io/cds-data-pipeline/sources/custom/) for anything else.
-- **Target adapters** — [local DB](https://mikezaschka.github.io/cds-data-pipeline/targets/db/) (default), [remote OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/targets/odata/), and a pluggable [`BaseTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/targets/custom/) for non-db / non-OData destinations.
-- **Delta modes** — polling-based `timestamp` / `key` / `datetime-fields` for entity-shape reads; `full` and `partial-refresh` for query-shape. See [Inference rules](https://mikezaschka.github.io/cds-data-pipeline/concepts/inference/).
-- **Consumption views** — declare the target as a `projection on <remote.Entity>` annotated with `@cds.persistence.table`. One CDS declaration defines schema, column restriction, rename mapping, and filter. See [Consumption views](https://mikezaschka.github.io/cds-data-pipeline/concepts/consumption-views/).
-- **Event hooks** — lifecycle events `PIPELINE.START` / `PIPELINE.DONE` bracket each run; `PIPELINE.READ` / `PIPELINE.MAP_BATCH` / `PIPELINE.WRITE_BATCH` drive the phases. Via CAP's native `before / on / after` API. See [Event hooks](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/#event-hooks).
-- **Scheduling** — in-process `spawn`, cross-instance persistent [`queued` engine](https://mikezaschka.github.io/cds-data-pipeline/recipes/internal-scheduling-queued/), or external drive via [SAP BTP Job Scheduling Service](https://mikezaschka.github.io/cds-data-pipeline/recipes/external-scheduling-jss/) / Kubernetes `CronJob`.
-- **Management OData service** — [`Pipelines`, `PipelineRuns`, `execute`, bound `start`, `flush`, `status`](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/) at `/pipeline`.
-- **Observability** — per-pipeline tracker, per-run history, `created` / `updated` / `deleted` / `skipped` statistics, optional request-level snapshots. See [Features → Observability](https://mikezaschka.github.io/cds-data-pipeline/reference/features/#observability).
+- **Source adapters** — [OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/odata.html), [REST](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/rest.html) (cursor / offset / page pagination, `dataPath` extraction), [CQN](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/cqn.html) (in-process CAP services and DB bindings), plus a pluggable [`BaseSourceAdapter`](https://mikezaschka.github.io/cds-data-pipeline/guide/sources/custom.html) for anything else.
+- **Target adapters** — [local DB](https://mikezaschka.github.io/cds-data-pipeline/guide/targets/db.html) (default), [remote OData V2 / V4](https://mikezaschka.github.io/cds-data-pipeline/guide/targets/odata.html), and a pluggable [`BaseTargetAdapter`](https://mikezaschka.github.io/cds-data-pipeline/guide/targets/custom.html) for non-db / non-OData destinations.
+- **Delta modes** — polling-based `timestamp` / `key` / `datetime-fields` for entity-shape reads; `full` and `partial-refresh` for query-shape. See [Inference rules](https://mikezaschka.github.io/cds-data-pipeline/guide/concepts/inference.html).
+- **Consumption views** — declare the target as a `projection on <remote.Entity>` annotated with `@cds.persistence.table`. One CDS declaration defines schema, column restriction, rename mapping, and filter. See [Consumption views](https://mikezaschka.github.io/cds-data-pipeline/guide/concepts/consumption-views.html).
+- **Event hooks** — lifecycle events `PIPELINE.START` / `PIPELINE.DONE` bracket each run; `PIPELINE.READ` / `PIPELINE.MAP_BATCH` / `PIPELINE.WRITE_BATCH` drive the phases. Via CAP's native `before / on / after` API. See [Event hooks](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service.html#event-hooks).
+- **Scheduling** — in-process `spawn`, cross-instance persistent [`queued` engine](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/internal-scheduling-queued.html), or external drive via [SAP BTP Job Scheduling Service](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/external-scheduling-jss.html) / Kubernetes `CronJob`.
+- **Management OData service** — [`Pipelines`, `PipelineRuns`, `execute`, bound `start`, `flush`, `status`](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service.html) at `/pipeline`.
+- **Observability** — per-pipeline tracker, per-run history, `created` / `updated` / `deleted` / `skipped` statistics, optional request-level snapshots. See [Features → Observability](https://mikezaschka.github.io/cds-data-pipeline/reference/features.html#observability).
 - **Resilience** — retry with exponential backoff, concurrency guard, and per-batch or per-run transaction scope.
-- **Plugin entry points** — four extension points, ordered by how much code you write: built-in adapters (no code), [custom source adapter](https://mikezaschka.github.io/cds-data-pipeline/recipes/custom-source-adapter/), [custom target adapter](https://mikezaschka.github.io/cds-data-pipeline/recipes/custom-target-adapter/), [`PIPELINE.*` event hooks](https://mikezaschka.github.io/cds-data-pipeline/recipes/event-hooks/).
+- **Plugin entry points** — four extension points, ordered by how much code you write: built-in adapters (no code), [custom source adapter](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/custom-source-adapter.html), [custom target adapter](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/custom-target-adapter.html), [`PIPELINE.*` event hooks](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/event-hooks.html).
 
 ## Install
 
@@ -97,7 +97,7 @@ const pipelines = await cds.connect.to('DataPipelineService');
 
 // Register a pipeline. Behaviour is inferred from the config shape — `source.entity`
 // + db target → entity-shape (replicate use case) with mode 'delta'.
-// See https://mikezaschka.github.io/cds-data-pipeline/concepts/inference/
+// See https://mikezaschka.github.io/cds-data-pipeline/guide/concepts/inference.html
 await pipelines.addPipeline({
     name: 'BusinessPartners',
     source: { service: 'API_BUSINESS_PARTNER', entity: 'A_BusinessPartner' },
@@ -119,16 +119,16 @@ const { runId, done } = await pipelines.execute('BusinessPartners', { async: tru
 done.then(({ status, statistics }) => console.log(runId, status, statistics));
 ```
 
-Full event-hook surface (signatures, ordering, `req.data` payload per phase) is on the [Management Service reference page](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/#event-hooks).
+Full event-hook surface (signatures, ordering, `req.data` payload per phase) is on the [Management Service reference page](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service.html#event-hooks).
 
 ## Management service
 
-OData service at `/pipeline` (`DataPipelineManagementService`) — full reference on the [Management Service page](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/).
+OData service at `/pipeline` (`DataPipelineManagementService`) — full reference on the [Management Service page](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service.html).
 
 - `GET /pipeline/Pipelines` — configuration + statistics per pipeline.
 - `GET /pipeline/PipelineRuns` — per-run timing, trigger, status, statistics.
 - `POST /pipeline/execute` — `{ name, mode?, trigger?, async? }` — run a pipeline. Used by scripts, tests, and external schedulers (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...).
-- `POST /pipeline/Pipelines('<name>')/DataPipelineManagementService.start` — same run as `execute`, bound to the `Pipelines` instance (typical for Fiori object-page actions). See the [management service reference](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service/).
+- `POST /pipeline/Pipelines('<name>')/DataPipelineManagementService.start` — same run as `execute`, bound to the `Pipelines` instance (typical for Fiori object-page actions). See the [management service reference](https://mikezaschka.github.io/cds-data-pipeline/reference/management-service.html).
 - `POST /pipeline/flush` — `{ name }` — reset tracker + clear target output.
 
 Authorization for `/pipeline` is **not** defined by the plugin: add `@(requires: …)`, XSUAA, and routing rules in your own application.
@@ -138,9 +138,9 @@ Authorization for `/pipeline` is **not** defined by the plugin: add `@(requires:
 
 Pick one of three drive models per pipeline (mix freely across pipelines in the same app):
 
-- **Omit `schedule`** and trigger externally via `POST /pipeline/execute`. Recommended for BTP-native ops — see the [SAP BTP Job Scheduling Service recipe](https://mikezaschka.github.io/cds-data-pipeline/recipes/external-scheduling-jss/).
+- **Omit `schedule`** and trigger externally via `POST /pipeline/execute`. Recommended for BTP-native ops — see the [SAP BTP Job Scheduling Service recipe](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/external-scheduling-jss.html).
 - **`schedule: 600000`** (or `{ every, engine: 'spawn' }`) — in-process timer via `cds.spawn({ every })`. Best-effort, fires on every app instance. Good for dev and single-instance deployments.
-- **`schedule: { every: '10m', engine: 'queued' }`** — persistent task queue via `cds.queued(srv).schedule(...).every(...)`. Single-winner across instances, survives restarts, retry + dead-letter. Underlying CAP API is experimental. See the [queued scheduling recipe](https://mikezaschka.github.io/cds-data-pipeline/recipes/internal-scheduling-queued/).
+- **`schedule: { every: '10m', engine: 'queued' }`** — persistent task queue via `cds.queued(srv).schedule(...).every(...)`. Single-winner across instances, survives restarts, retry + dead-letter. Underlying CAP API is experimental. See the [queued scheduling recipe](https://mikezaschka.github.io/cds-data-pipeline/guide/recipes/internal-scheduling-queued.html).
 
 ## Documentation
 

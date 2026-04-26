@@ -37,7 +37,9 @@ mta_archives/
 # @cap-js/cds-typer
 @cds-models
 
-# MkDocs build output
+# MkDocs (legacy) / VitePress build output
 site/
+docs/.vitepress/dist
+docs/.vitepress/cache
 .cache/
 .venv/

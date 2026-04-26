@@ -61,7 +61,7 @@ async function createTargetAdapter(config) {
         `addPipeline: target.service='${targetService}' (kind='${kind || 'unknown'}') has no built-in ` +
         `target adapter. Either drop target.service to use the default DB adapter, set ` +
         `target.kind='odata' / 'odata-v2' if the remote speaks OData, or supply a target.adapter ` +
-        `class extending BaseTargetAdapter. See the custom-adapter guide at docs/targets/custom.md.`
+        `class extending BaseTargetAdapter. See the custom-adapter guide at docs/guide/targets/custom.md.`
     )
 }
 

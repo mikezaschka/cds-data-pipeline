@@ -15,12 +15,12 @@ Each example is meant to include the two monitor UIs (Fiori Elements **Pipeline 
 
 | Example | Plugin feature | Doc anchor | Port |
 |---|---|---|---|
-| [01-replicate-odata](01-replicate-odata/) | Entity-shape replicate from OData V4 via consumption view + `viewMapping` | [recipes/built-in-replicate](../docs/recipes/built-in-replicate.md) | 4101 |
-| [02-replicate-rest](02-replicate-rest/) | REST source with offset pagination + `modifiedSince` delta + `dataPath` | [sources/rest](../docs/sources/rest.md) | 4102 |
-| [03-materialize-cqn](03-materialize-cqn/) | Query-shape materialize (CQN aggregate) with `refresh: 'full'` + partial-refresh slice | [recipes/built-in-materialize](../docs/recipes/built-in-materialize.md) | 4103 |
-| [04-move-to-service](04-move-to-service/) | Move-to-service via `ODataTargetAdapter` — remote OData source → remote OData target | [recipes/built-in-replicate#to-a-remote-odata-target](../docs/recipes/built-in-replicate.md) | 4104 |
-| [05-multi-source-fanin](05-multi-source-fanin/) | N backends → one target table with `source.origin` + `plugin.data_pipeline.sourced` aspect | [recipes/multi-source](../docs/recipes/multi-source.md) | 4105 |
-| [06-event-hooks](06-event-hooks/) | Full 5-event envelope: `before/on/after` on `PIPELINE.START`/`READ`/`MAP_BATCH`/`WRITE_BATCH`/`DONE` | [recipes/event-hooks](../docs/recipes/event-hooks.md) | 4106 |
+| [01-replicate-odata](01-replicate-odata/) | Entity-shape replicate from OData V4 via consumption view + `viewMapping` | [recipes/built-in-replicate](../docs/guide/recipes/built-in-replicate.md) | 4101 |
+| [02-replicate-rest](02-replicate-rest/) | REST source with offset pagination + `modifiedSince` delta + `dataPath` | [sources/rest](../docs/guide/sources/rest.md) | 4102 |
+| [03-materialize-cqn](03-materialize-cqn/) | Query-shape materialize (CQN aggregate) with `refresh: 'full'` + partial-refresh slice | [recipes/built-in-materialize](../docs/guide/recipes/built-in-materialize.md) | 4103 |
+| [04-move-to-service](04-move-to-service/) | Move-to-service via `ODataTargetAdapter` — remote OData source → remote OData target | [recipes/built-in-replicate#to-a-remote-odata-target](../docs/guide/recipes/built-in-replicate.md) | 4104 |
+| [05-multi-source-fanin](05-multi-source-fanin/) | N backends → one target table with `source.origin` + `plugin.data_pipeline.sourced` aspect | [recipes/multi-source](../docs/guide/recipes/multi-source.md) | 4105 |
+| [06-event-hooks](06-event-hooks/) | Full 5-event envelope: `before/on/after` on `PIPELINE.START`/`READ`/`MAP_BATCH`/`WRITE_BATCH`/`DONE` | [recipes/event-hooks](../docs/guide/recipes/event-hooks.md) | 4106 |
 
 ## Port allocation
 
@@ -55,4 +55,4 @@ bash examples/01-replicate-odata/start.sh
 
 Each example README opens with a one-line anchor to the doc page it expands on. The docs are the reference; the examples show one end-to-end configuration plus its observable output. Code snippets in the docs are intentionally self-contained — the examples add the runnable wiring (CAP service file, HTTP scenarios, Pipeline Monitor setup) around them.
 
-A custom source / target adapter is intentionally not included here — the code lives in [docs/sources/custom.md](../docs/sources/custom.md) and [docs/targets/custom.md](../docs/targets/custom.md) and adds little that the six above don't already cover.
+A custom source / target adapter is intentionally not included here — the code lives in [Custom source](../docs/guide/sources/custom.md) and [Custom target](../docs/guide/targets/custom.md) and adds little that the six above don't already cover.

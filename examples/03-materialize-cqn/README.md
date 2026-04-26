@@ -1,6 +1,6 @@
 # Example 03 — Materialize CQN aggregate
 
-**What this shows:** query-shape pipelines that materialize the result of a CQN aggregate query as a local snapshot — both `refresh: 'full'` (rebuild the whole snapshot) and `refresh: { mode: 'partial', slice }` (rebuild only the affected slice). See [docs/recipes/built-in-materialize.md](../../docs/recipes/built-in-materialize.md).
+**What this shows:** query-shape pipelines that materialize the result of a CQN aggregate query as a local snapshot — both `refresh: 'full'` (rebuild the whole snapshot) and `refresh: { mode: 'partial', slice }` (rebuild only the affected slice). See [docs/guide/recipes/built-in-materialize.md](../../docs/guide/recipes/built-in-materialize.md).
 
 **Source:** in-process `SalesService.Orders`.
 **Targets:**
@@ -43,7 +43,7 @@ refresh: 'full',
 
 Key points:
 
-- **Query-shape pipeline.** The presence of `source.query` flips the pipeline into query-shape mode. Row-delta modes (`timestamp`, `key`, `datetime-fields`) are rejected by validation; only `refresh: 'full'` or `refresh: { mode: 'partial', slice }` are accepted. See [concepts/inference.md](../../docs/concepts/inference.md).
+- **Query-shape pipeline.** The presence of `source.query` flips the pipeline into query-shape mode. Row-delta modes (`timestamp`, `key`, `datetime-fields`) are rejected by validation; only `refresh: 'full'` or `refresh: { mode: 'partial', slice }` are accepted. See [concepts/inference.md](../../docs/guide/concepts/inference.md).
 - **Plain closure, not `async`.** `cds.ql` builders are thenable — `await`ing one executes it. Keep `source.query` a non-async function that *returns* the builder; the runtime awaits it against the configured source service.
 - **`refresh: 'full'`.** Target table is truncated and the aggregate rows are re-inserted inside one transaction. Crash-safe at the transaction boundary: the previous snapshot stays intact on failure.
 - **`refresh: { mode: 'partial', slice }`.** The `slice` predicate is applied as a DELETE against the target before the INSERT. The `source.query` is narrowed to produce the same slice so inserts don't collide with stale unchanged rows.
@@ -63,6 +63,6 @@ The persisted tracker enum is `{ delta, full }`. `refresh: 'partial'` is accepte
 
 ## See also
 
-- [Recipes → Built-in materialize](../../docs/recipes/built-in-materialize.md) — reference walkthrough.
-- [Sources → CQN](../../docs/sources/cqn.md) — adapter options and both query shapes.
+- [Recipes → Built-in materialize](../../docs/guide/recipes/built-in-materialize.md) — reference walkthrough.
+- [Sources → CQN](../../docs/guide/sources/cqn.md) — adapter options and both query shapes.
 - [Example 01 — Replicate OData](../01-replicate-odata/) — the entity-shape twin recipe.

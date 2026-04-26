@@ -150,4 +150,4 @@ The tracker is reset for `BP_DEV` (`lastSync`, `lastKey`, statistics → zero); 
 
 - [Concepts → Inference rules](../concepts/inference.md) — where origin fits in the pipeline-kind table.
 - [Built-in replicate](built-in-replicate.md) — the single-origin baseline this recipe extends.
-- [Reference → Management Service](../reference/management-service.md) — `flush`, `status`, `run`.
+- [Reference → Management Service](../../reference/management-service.md) — `flush`, `status`, `run`.

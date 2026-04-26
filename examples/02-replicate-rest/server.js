@@ -16,7 +16,7 @@ cds.on('served', async () => {
         // - `path`        : appended to `credentials.url` from cds.requires
         // - `pagination`  : 'offset' emits `limit` / `offset` (FXService
         //                   reads these). 'cursor' / 'page' are the other
-        //                   built-in modes — see docs/sources/rest.md.
+        //                   built-in modes — see docs/guide/sources/rest.md.
         // - `deltaParam`  : URL param populated from tracker.lastSync on
         //                   incremental runs. First run omits the param
         //                   (no watermark yet) and fetches everything.

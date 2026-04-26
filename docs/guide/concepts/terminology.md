@@ -56,7 +56,7 @@ All three are implemented for OData V4 and V2. REST supports `timestamp` via con
 - **Pipelines** — one row per registered pipeline. Carries source / target references, current `mode`, `lastSync`, `lastKey`, cumulative statistics, and status. Behaviour is inferred from the current config at registration (see [Inference rules](inference.md)).
 - **PipelineRuns** — one row per invocation. Carries start / end timestamps, trigger type, per-phase statistics (`created` / `updated` / `deleted` / `skipped`), mode, and any error context for failed runs.
 
-See the [Management Service reference](../reference/management-service.md) for the OData shape and available actions.
+See the [Management Service reference](../../reference/management-service.md) for the OData shape and available actions.
 
 ---
 

@@ -31,8 +31,9 @@ module.exports = async () => {
 };
 ```
 
-!!! note "Don't set both"
-    Setting `schedule` alongside an external trigger fires the pipeline twice per interval. The tracker's concurrency guard prevents duplicate work (the overlap is a no-op) but wastes CPU and produces noisy logs. Pick one side.
+::: info Don't set both
+Setting `schedule` alongside an external trigger fires the pipeline twice per interval. The tracker's concurrency guard prevents duplicate work (the overlap is a no-op) but wastes CPU and produces noisy logs. Pick one side.
+:::
 
 ## 2. Secure the management action
 
@@ -143,5 +144,5 @@ Authorization: Bearer <JSS-issued JWT>
 
 ## See also
 
-- [Reference → Management Service](../reference/management-service.md) — full action surface, tracker schema, and the `RunTrigger` enum.
+- [Reference → Management Service](../../reference/management-service.md) — full action surface, tracker schema, and the `RunTrigger` enum.
 - [Internal scheduling with the queued engine](internal-scheduling-queued.md) — an alternative when you want persistence and cross-instance single-winner without an external service.

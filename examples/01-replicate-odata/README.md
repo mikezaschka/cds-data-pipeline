@@ -1,6 +1,6 @@
 # Example 01 — Replicate from OData V4
 
-**What this shows:** entity-shape replicate from a remote OData V4 service into a local DB table, using a consumption view + `viewMapping`. This is the canonical `cds-data-pipeline` recipe — see [docs/recipes/built-in-replicate.md](../../docs/recipes/built-in-replicate.md).
+**What this shows:** entity-shape replicate from a remote OData V4 service into a local DB table, using a consumption view + `viewMapping`. This is the canonical `cds-data-pipeline` recipe — see [docs/guide/recipes/built-in-replicate.md](../../docs/guide/recipes/built-in-replicate.md).
 
 **Source:** the bundled [LogisticsService](../_providers/logistics-service/) (CAP OData V4, `:4455`).
 **Target:** local SQLite table `example01.Shipments`.
@@ -47,7 +47,7 @@ Open <http://localhost:4101/launchpage.html>, click the **Pipeline Monitor** til
 
 ## See also
 
-- [Concepts → Consumption views](../../docs/concepts/consumption-views.md) — why `@cds.persistence.table` + projection + viewMapping is the recommended pattern.
-- [Sources → OData](../../docs/sources/odata.md) — OData V2 / V4 adapter details.
-- [Targets → Local DB](../../docs/targets/db.md) — `DbTargetAdapter` semantics.
+- [Concepts → Consumption views](../../docs/guide/concepts/consumption-views.md) — why `@cds.persistence.table` + projection + viewMapping is the recommended pattern.
+- [Sources → OData](../../docs/guide/sources/odata.md) — OData V2 / V4 adapter details.
+- [Targets → Local DB](../../docs/guide/targets/db.md) — `DbTargetAdapter` semantics.
 - [Example 06 — Event hooks](../06-event-hooks/) — layers `before` / `after` hooks on this same pipeline.

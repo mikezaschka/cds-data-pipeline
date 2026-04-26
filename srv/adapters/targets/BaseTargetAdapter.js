@@ -66,7 +66,7 @@ const cds = require('../../runtime-cds')
  *    `target.adapter`; the factory rejects unresolved target services
  *    at registration time.
  *
- * See `docs/targets/custom.md` for worked examples.
+ * See `docs/guide/targets/custom.md` for worked examples.
  */
 class BaseTargetAdapter {
     /**

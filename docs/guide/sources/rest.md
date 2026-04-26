@@ -181,7 +181,7 @@ pipelines.on('PIPELINE.MAP_BATCH', 'ReplicatedRestCustomers', async (req) => {
 });
 ```
 
-See [Reference → Management Service → Event hooks](../reference/management-service.md#event-hooks) for the full hook surface.
+See [Reference → Management Service → Event hooks](../../reference/management-service.md#event-hooks) for the full hook surface.
 
 ## Limitations
 
@@ -191,6 +191,6 @@ See [Reference → Management Service → Event hooks](../reference/management-s
 
 ## See also
 
-- [Reference → Management Service](../reference/management-service.md) — hook into READ / MAP / WRITE phases.
+- [Reference → Management Service](../../reference/management-service.md) — hook into READ / MAP / WRITE phases.
 - [Sources → OData adapter](odata.md) — for services with a CDS model.
 - [Concepts → Inference rules](../concepts/inference.md) — why `rest.path` counts as an entity-shape signal.

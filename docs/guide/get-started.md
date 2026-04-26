@@ -32,9 +32,13 @@ Expose the **management OData** surface by reusing the plugin’s service defini
 using from 'cds-data-pipeline/srv/DataPipelineManagementService';
 ```
 
-You can `extend` or annotate that service in your app for authorization. The plugin does not ship auth annotations; see [Management Service](reference/management-service.md#securing-pipeline-in-your-app).
+You can `extend` or annotate that service in your app for authorization. The plugin does not ship auth annotations; see [Management Service](../reference/management-service.md#securing-pipeline-in-your-app).
 
 ## 2. Import the Northwind OData API
+
+The plugin only needs the **connected service name** (e.g. `northwind`) and **entity** names that come from the model you import — same as any CAP app that **consumes an OData API**. The steps below are the standard [capire **OData import** flow](https://cap.cloud.sap/docs/guides/integration/calesi#odata-apis) (`$metadata` → **`cds import`** → `cds.requires`); skip the expander if you already have an imported service in this project.
+
+::: details `cds import` and Northwind (standard CAP, step-by-step)
 
 Use the same flow as capire [**Consuming external services → OData APIs**](https://cap.cloud.sap/docs/guides/integration/calesi#odata-apis): start from an **OData EDMX** (metadata) file on disk, then run **`cds import`**. That command copies the file into **`srv/external/`**, generates a **`.csn`** beside it, and **merges the required `cds.requires` entry into your app’s `package.json`**. For **`cds-data-pipeline` there is nothing to add beyond that**—the plugin only needs the connected service name (e.g. `northwind`) that `cds import` registers.
 
@@ -59,6 +63,8 @@ using { northwind as external } from './external/northwind';
 ```
 
 (paths are relative to **`srv/`** in service code—adjust for your layout). The service name in CSN (here **`northwind`**) is what you pass as `source.service` in `addPipeline` below.
+
+:::
 
 ## 3. Define a consumption view
 
@@ -136,12 +142,12 @@ Then run `npm install` and `cds watch`, and open `/pipeline-console/index.html` 
 
 **Without the scaffold, you can:**
 
-- Use the **management OData API** directly, for example `GET /pipeline/Pipelines` and `GET /pipeline/PipelineRuns`. See [Management Service](reference/management-service.md).
+- Use the **management OData API** directly, for example `GET /pipeline/Pipelines` and `GET /pipeline/PipelineRuns`. See [Management Service](../reference/management-service.md).
 - Reuse the **reference UI** in this repository: build the shared UI5 apps under `examples/_ui-pipeline` and mount them with cds-plugin-ui5, as in [examples/01-replicate-odata](https://github.com/mikezaschka/cds-data-pipeline/tree/main/examples/01-replicate-odata) (`pipeline-monitor` at `/pipeline-monitor`, `pipeline-console` at `/pipeline-console`).
 
 ## 7. Query the service and check the data
 
-1. **Trigger a run** if you did not set `schedule`: `POST /pipeline/execute` with body `{ "name": "NorthwindProducts", "mode": "full" }` (and auth if you secured `/pipeline`). See [`execute`](reference/management-service.md#execute).
+1. **Trigger a run** if you did not set `schedule`: `POST /pipeline/execute` with body `{ "name": "NorthwindProducts", "mode": "full" }` (and auth if you secured `/pipeline`). See [`execute`](../reference/management-service.md#execute).
 2. **Tracker:** `GET /pipeline/Pipelines('NorthwindProducts')` or `GET /pipeline/status(name='NorthwindProducts')`.
 3. **Business data:** query your app’s OData entity that projects `my.app.LocalProducts` (or `SELECT` from the entity in CAP) and confirm rows match non-discontinued Northwind products.
 

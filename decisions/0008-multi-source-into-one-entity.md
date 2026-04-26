@@ -11,7 +11,7 @@ Extends: ADR 0007 — Infer pipeline intent from config shape
 
 > **Not a DAG runner.** One source, one target, per pipeline. No fan-in, fan-out, chaining, or composition.
 
-The rule is load-bearing for ADR 0007 — the whole inference machine in [docs/concepts/inference.md](../docs/concepts/inference.md) presumes a single `source.{entity,query}` shape produces a single tracker row and a single WRITE target. `addPipeline` in [srv/DataPipelineService.js](../srv/DataPipelineService.js) encodes this: one pipeline name, one `cds.requires.<service>` key, one target entity.
+The rule is load-bearing for ADR 0007 — the whole inference machine in [docs/guide/concepts/inference.md](../docs/guide/concepts/inference.md) presumes a single `source.{entity,query}` shape produces a single tracker row and a single WRITE target. `addPipeline` in [srv/DataPipelineService.js](../srv/DataPipelineService.js) encodes this: one pipeline name, one `cds.requires.<service>` key, one target entity.
 
 Real-world CAP replication deployments — exemplified by [gregorwolf/cap-replication-demo](https://github.com/gregorwolf/cap-replication-demo) — routinely need to ingest the same logical entity (`A_BusinessPartner`, `Product`, …) from **multiple instances of the same backend** (e.g. `S4HANA_DEV` + `S4HANA` + `S4HANA_QA`) and materialize all rows into **one local table**. The demo solves this outside the framework with four coordinated pieces:
 
@@ -37,7 +37,7 @@ This ADR decides how `cds-data-pipeline` absorbs the multi-source scenario witho
 | G1 | **Source discriminator aspect** | No shipped aspect analogous to `replication.source`. Consumers rebuild the pattern every time, usually getting the association-`source` extension wrong. | v1 |
 | G2 | **Origin label on registration** | `addPipeline` has no way to stamp a source label into the target when multiple pipelines share a target entity. Consumers build the pattern manually in MAP hooks and get per-source flush wrong. | v1 |
 | G3 | **Per-source scoped flush / delta** | `POST /pipeline/flush` in [srv/DataPipelineManagementService.js](../srv/DataPipelineManagementService.js) wipes the whole target entity. `lastSync` / `lastKey` are already per-pipeline, so the read path is fine; the write/clear path is not. | v1 |
-| G4 | **Messaging / CDC source adapter** | [srv/adapters/factory.js](../srv/adapters/factory.js) knows only `odata`, `odata-v2`, `rest`, `cqn`. No adapter for CAP's `messaging`, SAP Event Mesh, or webhook push. Consumers route cloud events manually outside the pipeline. | v2 |
+| G4 | **Messaging / event-driven runs** | [srv/adapters/factory.js](../srv/adapters/factory.js) knows only `odata`, `odata-v2`, `rest`, `cqn`. No first-class event ingestion that shares the same `PipelineRuns` / MAP path as batch. See **[ADR 0009 — Event-driven pipeline runs](0009-event-driven-pipeline-runs.md)** (proposed API: `handleEvent` + two payload strategies; supersedes the earlier “`MessagingAdapter` + `source.kind: 'messaging'`” sketch for the first shippable increment). | v2 |
 | G5 | **Multi-entity-per-API registration sugar** | Consumers call `addPipeline` N times per API family, duplicating `source.service`, shared filter, schedule, delta config. | v3 |
 | G6 | **Reverse-merge / cross-source consolidation recipe** | The demo's `UpsertService.entitiesInS4` pattern (pick source X, push its rows into destination Y, concatenating `LargeString` fields) has no documented equivalent. | v4 |
 | G7 | **Outbound CloudEvents emission after WRITE** | Doable today with `srv.after('PIPELINE.WRITE', …)`, but no recipe, no `emit: { channel, event }` sugar, no outbox wiring. | v5 |
@@ -79,7 +79,7 @@ flowchart LR
 ```
 
 - `addPipeline({ sources: [{ service, origin }, ...], target, ... })`. Engine loops sources (sequential or bounded-parallel) and treats each source iteration as a sub-run.
-- Requires: a new kind `fan-in` in the inference table ([docs/concepts/inference.md](../docs/concepts/inference.md)); per-source tracker rows (`PipelineRuns.origin`); per-source retry; and relaxing the "single-winner `on` handler" assumption called out in [README.md](../README.md) L12 because MAP/WRITE hooks must now receive `req.data.origin` to route correctly.
+- Requires: a new kind `fan-in` in the inference table ([docs/guide/concepts/inference.md](../docs/guide/concepts/inference.md)); per-source tracker rows (`PipelineRuns.origin`); per-source retry; and relaxing the "single-winner `on` handler" assumption called out in [README.md](../README.md) L12 because MAP/WRITE hooks must now receive `req.data.origin` to route correctly.
 
 Trade-offs:
 
@@ -187,10 +187,10 @@ Engine behavior when `source.origin` is set:
 | [srv/DataPipelineManagementService.js](../srv/DataPipelineManagementService.js) | `flush` action honors per-origin scope. `status(name)` surfaces `origin`. `Pipelines` projection exposes `origin`. |
 | [srv/adapters/factory.js](../srv/adapters/factory.js) | v2: route `kind: 'messaging'` to `MessagingAdapter`. |
 | New: `srv/adapters/MessagingAdapter.js` | v2. Subscribes via `cds.connect.to('messaging')`, surfaces an async iterable of single-row batches to `PIPELINE.READ`, maps CloudEvents `subject` → primary key via a configurable `keyFromEvent(msg)` function. |
-| [docs/concepts/inference.md](../docs/concepts/inference.md) | Add a "Multi-source (origin stamp)" sub-section to the derived-kind table noting that `source.origin` is orthogonal to `kind` — it composes with `replicate` and `move`, never with `materialize`. |
+| [docs/guide/concepts/inference.md](../docs/guide/concepts/inference.md) | Add a "Multi-source (origin stamp)" sub-section to the derived-kind table noting that `source.origin` is orthogonal to `kind` — it composes with `replicate` and `move`, never with `materialize`. |
 | [docs/reference/features.md](../docs/reference/features.md) | Add a "Multi-source fan-in" row under Source adapters. |
-| New: `docs/recipes/multi-source.md` | End-to-end worked example — BP from `API_BP_DEV` + `API_BP_PROD` into one local table, including per-origin flush assertion. |
-| New: `docs/recipes/merge-sources.md` | v4. Reverse-merge pattern (`UpsertService.entitiesInS4` analogue) expressed as a WRITE-hook recipe. |
+| New: `docs/guide/recipes/multi-source.md` | End-to-end worked example — BP from `API_BP_DEV` + `API_BP_PROD` into one local table, including per-origin flush assertion. |
+| New: `docs/guide/recipes/merge-sources.md` | v4. Reverse-merge pattern (`UpsertService.entitiesInS4` analogue) expressed as a WRITE-hook recipe. |
 | New: `docs/integration/messaging.md` | v2. CDC adapter reference. |
 | [README.md](../README.md) | Re-word the "Not a DAG runner" bullet to clarify that "fan-in" there means *engine-internal* composition — multi-source-to-one via sibling pipelines + origin stamp is supported. |
 
@@ -207,19 +207,14 @@ Deliverables:
 - `plugin.data_pipeline.sourced` aspect.
 - `source.origin` label on `addPipeline`; `Pipelines.origin` + `PipelineRuns.origin` tracker columns.
 - Default MAP stamps `source = origin`; default flush scopes to `source = origin`.
-- `docs/recipes/multi-source.md` showing the two-`cds.requires`-entries-plus-two-pipelines pattern.
+- `docs/guide/recipes/multi-source.md` showing the two-`cds.requires`-entries-plus-two-pipelines pattern.
 - README clarification that fan-in is supported via sibling pipelines + origin stamp.
 
-### v2 — Messaging / CDC source adapter
+### v2 — Event-driven runs + messaging (G4)
 
-Ships: G4.
+**Normative design:** [ADR 0009 — Event-driven pipeline runs](0009-event-driven-pipeline-runs.md) — `DataPipelineService` API to run micro-runs (key vs payload), shared MAP/WRITE, default watermark separation from batch, optional `PipelineRuns` event metadata. Application registers `messaging.on` (v1) or optional declarative topic wiring later.
 
-Deliverables:
-
-- `srv/adapters/MessagingAdapter.js` + factory routing for `kind: 'messaging'`.
-- Inference row: `source.kind = 'messaging'` implies `mode: 'event'`, no polling, no `delta.*`. The pipeline runs on subscription rather than schedule.
-- `docs/integration/messaging.md` with CAP in-process `messaging` and SAP Event Mesh examples.
-- Composes with v1: a messaging-driven pipeline carries `source.origin` when the event payload identifies a source system.
+Earlier sketch (`MessagingAdapter` + `source.kind: 'messaging'`) is **not** the first deliverable; a dedicated `handleEvent` path is preferred. A factory `kind: 'messaging'` may still wrap the same internals in a follow-up.
 
 ### v3 — Multi-entity-per-API registration sugar
 
@@ -230,7 +225,7 @@ Deliverables:
 - `pipelines.addPipelineGroup({ source: { service, origin }, entities: [...], sharedFilter, schedule, delta })` → expands internally to N `addPipeline` calls with auto-derived names (`<group>__<entity>__<origin>`).
 - A group is scoped to one `cds.requires` service by definition — "all entities behind this backend replicate together". Ingesting the same family from a second backend is a second `addPipelineGroup` call.
 - No schema or tracker change — each expanded pipeline is still a v1-shape sibling.
-- `docs/recipes/pipeline-groups.md`.
+- `docs/guide/recipes/pipeline-groups.md`.
 
 ### v4 — Reverse-merge recipe
 
@@ -238,7 +233,7 @@ Ships: G6.
 
 Deliverables:
 
-- `docs/recipes/merge-sources.md`: picking a source origin, pushing its rows back to a target backend, with the demo's `LargeString` concatenation pattern documented as one of several merge strategies (overwrite / concat / last-write-wins).
+- `docs/guide/recipes/merge-sources.md`: picking a source origin, pushing its rows back to a target backend, with the demo's `LargeString` concatenation pattern documented as one of several merge strategies (overwrite / concat / last-write-wins).
 - No engine change — pure application-code recipe built on the existing WRITE hook.
 
 ### v5 — Outbound CloudEvents emission
@@ -247,13 +242,13 @@ Ships: G7.
 
 Deliverables:
 
-- `docs/recipes/emit-cloud-events.md` using `srv.after('PIPELINE.WRITE', …)`.
+- `docs/guide/recipes/emit-cloud-events.md` using `srv.after('PIPELINE.WRITE', …)`.
 - Optional `emit: { channel, event }` sugar on `addPipeline` that installs the after-hook at registration time.
 
 ## Acceptance criteria (v1)
 
 - Back-compat: existing pipelines without `source.origin` keep working unchanged; `Pipelines.origin` defaults to `null`. No data migration required.
-- Flushing pipeline `BP_DEV` leaves `source = 'PROD'` rows untouched — asserted in `docs/recipes/multi-source.md` with a SQL snippet: `SELECT COUNT(*) FROM db.BusinessPartners WHERE source = 'PROD'` before and after `POST /pipeline/flush { name: 'BP_DEV' }`.
+- Flushing pipeline `BP_DEV` leaves `source = 'PROD'` rows untouched — asserted in `docs/guide/recipes/multi-source.md` with a SQL snippet: `SELECT COUNT(*) FROM db.BusinessPartners WHERE source = 'PROD'` before and after `POST /pipeline/flush { name: 'BP_DEV' }`.
 - The `cds w` startup log extends the ADR-0007 shape line with an `origin=DEV` suffix when present.
 - `DOC_REF` in [srv/DataPipelineService.js](../srv/DataPipelineService.js) gains a sibling `DOC_REF_FAN_IN` pointing at the public multi-source recipe URL, used in the new validation messages (target-aspect-missing and `origin + query` rejection).
 - `_validateConfig` rejects: (a) `source.origin` + `source.query` (materialize is origin-agnostic); (b) `source.origin` set on a target entity that does not include the `plugin.data_pipeline.sourced` aspect, with an error message naming the aspect import path.
@@ -286,5 +281,5 @@ The service key itself carries the backend identity (one `cds.requires` entry pe
 
 - ADR 0007 — Infer pipeline intent from config shape.
 - [gregorwolf/cap-replication-demo](https://github.com/gregorwolf/cap-replication-demo) — specifically `db/schema.cds`, `srv/replication-service.js`, `srv/upsert-service.js`, `srv/map.js`, `srv/event-service.js`.
-- [docs/concepts/inference.md](../docs/concepts/inference.md) — the inference table this ADR composes with.
+- [docs/guide/concepts/inference.md](../docs/guide/concepts/inference.md) — the inference table this ADR composes with.
 - [README.md](../README.md) L19 — the "Not a DAG runner" non-goal this ADR refines.

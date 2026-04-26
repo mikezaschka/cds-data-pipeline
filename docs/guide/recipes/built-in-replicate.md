@@ -113,4 +113,4 @@ The OData target adapter routes writes through CAP's remote runtime (POST / PUT 
 - [Concepts → Inference rules](../concepts/inference.md).
 - [Sources → OData V2 / V4](../sources/odata.md) · [REST](../sources/rest.md) · [CQN](../sources/cqn.md).
 - [Targets → Local DB](../targets/db.md) · [OData](../targets/odata.md).
-- [Reference → Management Service](../reference/management-service.md).
+- [Reference → Management Service](../../reference/management-service.md).

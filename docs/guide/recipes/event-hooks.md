@@ -23,7 +23,7 @@ Two semantic rules govern composition:
 - **`on` replaces the built-in default.** Default `on` handlers exist for `PIPELINE.READ`, `PIPELINE.MAP_BATCH`, and `PIPELINE.WRITE_BATCH`; a user `on` takes over that slot entirely. `PIPELINE.START` and `PIPELINE.DONE` have no default — consumers add behaviour via any of `before` / `on` / `after`.
 - **`before` and `after` layer on top.** They compose with whatever `on` handler is active (default or user-supplied). Use them whenever you want to extend rather than replace.
 
-See [Reference → Management Service → Event hooks](../reference/management-service.md#event-hooks) for the authoritative signature table.
+See [Reference → Management Service → Event hooks](../../reference/management-service.md#event-hooks) for the authoritative signature table.
 
 ## `PIPELINE.START`
 
@@ -247,15 +247,17 @@ Pair with `after('PIPELINE.START', ...)` to bracket the run with trace instrumen
 
 ## Ordering and composition
 
-!!! note "Signature convention"
-    Per CAP convention: `before` and `on` hooks receive `(req)`; `after` hooks receive `(results, req)`. For non-READ events `results` is usually `undefined`, so `after` hooks should read and mutate state on the second argument (`req.data`).
+::: info Signature convention
+Per CAP convention: `before` and `on` hooks receive `(req)`; `after` hooks receive `(results, req)`. For non-READ events `results` is usually `undefined`, so `after` hooks should read and mutate state on the second argument (`req.data`).
+:::
 
-!!! note "Ordering"
-    Multiple hooks for the same `(event, path)` run in parallel. For sequential ordering, register with `srv.prepend(() => srv.before(...))`.
+::: info Ordering
+Multiple hooks for the same `(event, path)` run in parallel. For sequential ordering, register with `srv.prepend(() => srv.before(...))`.
+:::
 
 ## See also
 
 - [Recipes → Custom source adapter](custom-source-adapter.md) — the reusable alternative when a `PIPELINE.READ` override would otherwise get copied across pipelines.
 - [Recipes → Custom target adapter](custom-target-adapter.md) — the reusable, capability-gated alternative to a `PIPELINE.WRITE_BATCH` override.
-- [Reference → Management Service → Event hooks](../reference/management-service.md#event-hooks) — authoritative signature and `req.data` reference.
+- [Reference → Management Service → Event hooks](../../reference/management-service.md#event-hooks) — authoritative signature and `req.data` reference.
 - [Concepts → Terminology → Event namespace](../concepts/terminology.md#event-namespace) — `PIPELINE.*` hook semantics.

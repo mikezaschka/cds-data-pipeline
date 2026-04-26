@@ -1,6 +1,6 @@
 # Example 04 — Move to service
 
-**What this shows:** write pipeline output to a remote OData target via the built-in `ODataTargetAdapter`. No local DB table for the target — rows flow over HTTP(S) straight into another service. See [docs/targets/odata.md](../../docs/targets/odata.md) and [docs/recipes/built-in-replicate.md#to-a-remote-odata-target](../../docs/recipes/built-in-replicate.md).
+**What this shows:** write pipeline output to a remote OData target via the built-in `ODataTargetAdapter`. No local DB table for the target — rows flow over HTTP(S) straight into another service. See [docs/guide/targets/odata.md](../../docs/guide/targets/odata.md) and [docs/guide/recipes/built-in-replicate.md#to-a-remote-odata-target](../../docs/guide/recipes/built-in-replicate.md).
 
 **Source:** `LogisticsService.Shipments` at `http://localhost:4455/odata/v4/logistics/`.
 **Target:** `LogisticsService.ShipmentArchive` on the **same** provider (a separate service would look identical — just a different `target.service` name in `cds.requires`).
@@ -57,12 +57,12 @@ Walk through `http/10-run-and-query.http`:
 
 ## Known limitations
 
-- Statistics bias: `created` counts every UPSERTed row. See [docs/targets/odata.md](../../docs/targets/odata.md#known-limitations).
+- Statistics bias: `created` counts every UPSERTed row. See [docs/guide/targets/odata.md](../../docs/guide/targets/odata.md#known-limitations).
 - `truncate` / `deleteSlice` use read-then-delete without ETag guards; concurrent writers on the provider can leak rows past the sweep.
-- Not suitable for very large targets — shift to a [custom target adapter](../../docs/targets/custom.md) that exposes a provider-side clear action.
+- Not suitable for very large targets — shift to a [custom target adapter](../../docs/guide/targets/custom.md) that exposes a provider-side clear action.
 
 ## See also
 
-- [Targets → OData](../../docs/targets/odata.md) — full reference.
-- [Recipes → Built-in replicate → To a remote OData target](../../docs/recipes/built-in-replicate.md).
-- [Targets → Custom target adapter](../../docs/targets/custom.md) — when OData isn't the right fit.
+- [Targets → OData](../../docs/guide/targets/odata.md) — full reference.
+- [Recipes → Built-in replicate → To a remote OData target](../../docs/guide/recipes/built-in-replicate.md).
+- [Targets → Custom target adapter](../../docs/guide/targets/custom.md) — when OData isn't the right fit.

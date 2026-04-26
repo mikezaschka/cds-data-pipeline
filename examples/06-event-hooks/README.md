@@ -1,6 +1,6 @@
 # Example 06 — Event hooks (5-event envelope)
 
-**What this shows:** layer `before` / `on` / `after` handlers on every phase of a pipeline run — `PIPELINE.START`, `PIPELINE.READ`, `PIPELINE.MAP_BATCH`, `PIPELINE.WRITE_BATCH`, `PIPELINE.DONE`. `DataPipelineService` is a standard `cds.Service`, so CAP's native hook API plugs straight in. See [docs/recipes/event-hooks.md](../../docs/recipes/event-hooks.md).
+**What this shows:** layer `before` / `on` / `after` handlers on every phase of a pipeline run — `PIPELINE.START`, `PIPELINE.READ`, `PIPELINE.MAP_BATCH`, `PIPELINE.WRITE_BATCH`, `PIPELINE.DONE`. `DataPipelineService` is a standard `cds.Service`, so CAP's native hook API plugs straight in. See [docs/guide/recipes/event-hooks.md](../../docs/guide/recipes/event-hooks.md).
 
 **Source:** `LogisticsService.Shipments` at `http://localhost:4455/odata/v4/logistics/`.
 **Target:** `example06.Shipments` (mirrors example 01) + `example06.BatchMetrics` (populated by the WRITE hook).
@@ -32,7 +32,7 @@ Stop with Ctrl+C.
 | `PIPELINE.WRITE_BATCH` | `after` | Per-batch metric — insert a `BatchMetrics` row within the pipeline's own transaction. |
 | `PIPELINE.DONE` | `after` | Run summary — log duration, batch count, and final statistics; release the run-scope state. |
 
-`req.data` carries different fields per event; see [recipes/event-hooks.md](../../docs/recipes/event-hooks.md#hook-surface-at-a-glance) for the full table.
+`req.data` carries different fields per event; see [recipes/event-hooks.md](../../docs/guide/recipes/event-hooks.md#hook-surface-at-a-glance) for the full table.
 
 ## `on` vs `before`/`after` semantics
 
@@ -66,6 +66,6 @@ Walk through `http/10-run-and-query.http`:
 
 ## See also
 
-- [Recipes → Event hooks](../../docs/recipes/event-hooks.md) — full reference walkthrough covering every event, both `on` and `before/after`.
+- [Recipes → Event hooks](../../docs/guide/recipes/event-hooks.md) — full reference walkthrough covering every event, both `on` and `before/after`.
 - [Reference → Management service → Event hooks](../../docs/reference/management-service.md#event-hooks) — signature table.
 - [Example 01 — Replicate OData](../01-replicate-odata/) — the baseline pipeline this example extends.

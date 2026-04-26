@@ -1,6 +1,6 @@
 # Features
 
-What `cds-data-pipeline` does, grouped by capability. Programmatic API reference is in [Management Service](management-service.md); protocol-specific notes are in the [OData](../sources/odata.md) and [REST](../sources/rest.md) adapter pages.
+What `cds-data-pipeline` does, grouped by capability. Programmatic API reference is in [Management Service](management-service.md); protocol-specific notes are in the [OData](../guide/sources/odata.md) and [REST](../guide/sources/rest.md) adapter pages.
 
 ## Source adapters
 
@@ -8,13 +8,13 @@ The READ phase of every pipeline uses a protocol-specific adapter. The adapter i
 
 | Adapter | Protocol support | Reference |
 |---|---|---|
-| **OData V4** | Batch reads with `$select` restriction, all three delta modes, `$top` / `$skip` pagination. | [Sources → OData V2 / V4](../sources/odata.md) |
-| **OData V2** | Same surface as V4, with V2 timestamp quirks handled. Provider needs `@cap-js-community/odata-v2-adapter`. | [Sources → OData V2 / V4](../sources/odata.md) |
-| **REST** | Cursor / offset / page pagination, configurable delta URL parameter, nested-response extraction via `dataPath`. | [Sources → REST Adapter](../sources/rest.md) |
-| **CQN** | Reads from CQN-native services (in-process CAP services, `cds.requires` DB bindings, CAP-wrapped legacy DBs). Serves both entity-shape (row-preserving) and query-shape (derived / aggregated snapshot) reads based on whether `source.query` is supplied. | [Sources → CQN Adapter](../sources/cqn.md) |
+| **OData V4** | Batch reads with `$select` restriction, all three delta modes, `$top` / `$skip` pagination. | [Sources → OData V2 / V4](../guide/sources/odata.md) |
+| **OData V2** | Same surface as V4, with V2 timestamp quirks handled. Provider needs `@cap-js-community/odata-v2-adapter`. | [Sources → OData V2 / V4](../guide/sources/odata.md) |
+| **REST** | Cursor / offset / page pagination, configurable delta URL parameter, nested-response extraction via `dataPath`. | [Sources → REST Adapter](../guide/sources/rest.md) |
+| **CQN** | Reads from CQN-native services (in-process CAP services, `cds.requires` DB bindings, CAP-wrapped legacy DBs). Serves both entity-shape (row-preserving) and query-shape (derived / aggregated snapshot) reads based on whether `source.query` is supplied. | [Sources → CQN Adapter](../guide/sources/cqn.md) |
 | **Server-driven paging** | Adapters keep paging until the remote returns an empty batch — transparent to the replication config. | Applies to OData V4 and V2 adapters. |
-| **Multi-source fan-in** | Consolidate the same logical entity from N backends into one target table via sibling pipelines, each stamping a `source.origin` label into a `source` key column contributed by the `plugin.data_pipeline.sourced` aspect. Per-origin `flush` and `mode: 'full'` scope DELETEs to their own origin. | [Recipes → Multi-source](../recipes/multi-source.md) |
-| **Auto-selection + custom base class** | Selected automatically from the service's `kind`, or routed explicitly via `source.kind` / `source.adapter` class ref. Custom adapters extend `BaseSourceAdapter`. | [Sources → Custom source adapter](../sources/custom.md) |
+| **Multi-source fan-in** | Consolidate the same logical entity from N backends into one target table via sibling pipelines, each stamping a `source.origin` label into a `source` key column contributed by the `plugin.data_pipeline.sourced` aspect. Per-origin `flush` and `mode: 'full'` scope DELETEs to their own origin. | [Recipes → Multi-source](../guide/recipes/multi-source.md) |
+| **Auto-selection + custom base class** | Selected automatically from the service's `kind`, or routed explicitly via `source.kind` / `source.adapter` class ref. Custom adapters extend `BaseSourceAdapter`. | [Sources → Custom source adapter](../guide/sources/custom.md) |
 
 ## Target adapters
 
@@ -22,9 +22,9 @@ The WRITE phase (and pre-write truncate / delete-slice) is delegated to a `BaseT
 
 | Adapter | Primitives | Reference |
 |---|---|---|
-| **`DbTargetAdapter`** (default) | `UPSERT` / `INSERT` / `DELETE` via `cds.connect.to('db')`. Reports all four capabilities (`keyAddressableUpsert`, `truncate`, `batchDelete`, `batchInsert`). | [Targets → Local DB](../targets/db.md) |
-| **`ODataTargetAdapter`** | Resolved when `target.kind` is `'odata' / 'odata-v2'`, or when the connected remote service advertises that kind. Routes `UPSERT` / `INSERT` through CAP's remote runtime (POST / PUT / PATCH, with `$batch` change sets where supported); `truncate` / `deleteSlice` page keys + issue per-row DELETE. Reports all four capabilities. | [Targets → OData](../targets/odata.md), [Recipes → Built-in replicate](../recipes/built-in-replicate.md#to-a-remote-odata-target) |
-| **Custom target adapter** | Pluggable class extending `BaseTargetAdapter` with `writeBatch`, `truncate`, `deleteSlice`, and `capabilities()`. Used for non-db, non-OData targets (message buses, custom HTTP APIs, …). | [Targets → Custom target adapter](../targets/custom.md), [Recipes → Custom target adapter](../recipes/custom-target-adapter.md) |
+| **`DbTargetAdapter`** (default) | `UPSERT` / `INSERT` / `DELETE` via `cds.connect.to('db')`. Reports all four capabilities (`keyAddressableUpsert`, `truncate`, `batchDelete`, `batchInsert`). | [Targets → Local DB](../guide/targets/db.md) |
+| **`ODataTargetAdapter`** | Resolved when `target.kind` is `'odata' / 'odata-v2'`, or when the connected remote service advertises that kind. Routes `UPSERT` / `INSERT` through CAP's remote runtime (POST / PUT / PATCH, with `$batch` change sets where supported); `truncate` / `deleteSlice` page keys + issue per-row DELETE. Reports all four capabilities. | [Targets → OData](../guide/targets/odata.md), [Recipes → Built-in replicate](../guide/recipes/built-in-replicate.md#to-a-remote-odata-target) |
+| **Custom target adapter** | Pluggable class extending `BaseTargetAdapter` with `writeBatch`, `truncate`, `deleteSlice`, and `capabilities()`. Used for non-db, non-OData targets (message buses, custom HTTP APIs, …). | [Targets → Custom target adapter](../guide/targets/custom.md), [Recipes → Custom target adapter](../guide/recipes/custom-target-adapter.md) |
 
 ## Management service
 
@@ -43,7 +43,7 @@ An OData service for operating pipelines at runtime. See [Management Service](ma
 
 | Capability | What it does |
 |---|---|
-| **Pipeline tracker** | `Pipelines` table persists name, source, target, mode, `lastSync`, `lastKey`, and status per pipeline. Behaviour is inferred from config shape at registration — no stored discriminator (see [Inference rules](../concepts/inference.md)). |
+| **Pipeline tracker** | `Pipelines` table persists name, source, target, mode, `lastSync`, `lastKey`, and status per pipeline. Behaviour is inferred from config shape at registration — no stored discriminator (see [Inference rules](../guide/concepts/inference.md)). |
 | **Run history** | Every run gets a `PipelineRuns` record with full context and timing. |
 | **Statistics** | `created` / `updated` / `deleted` / `skipped` counts per run and cumulative. |
 | **Request-level tracking** | Optional per-batch tracking with source and target data snapshots for debugging. |
@@ -55,8 +55,8 @@ Three ways to drive a pipeline. Pick the one that matches your operational model
 | Capability | What it does | When to pick it |
 |---|---|---|
 | **In-process `spawn` scheduling** (default) | Periodic runs driven by `cds.spawn({ every })`. `schedule: 600000` or `schedule: { every, engine: 'spawn' }`. Best-effort; fires on every app instance. | Single-instance deployments, dev, best-effort cadence. |
-| **In-process `queued` scheduling** | Persistent task queue via `cds.queued(srv).schedule(...).every(...)`. `schedule: { every: '10m', engine: 'queued' }`. Single-winner across app instances, survives restarts, retries with exponential backoff. Requires `cds.outbox.Messages`; underlying CAP API is experimental. | Self-contained CAP apps running with >1 instance that want persistence and cross-instance safety. See [Recipes → Internal scheduling with the queued engine](../recipes/internal-scheduling-queued.md). |
-| **External trigger** | Omit `schedule` entirely and call `POST /pipeline/execute` from an external scheduler (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...). The `execute` action accepts `trigger` and `async` parameters for correct attribution and fire-and-forget 202 responses. | Centralized corporate cron, BTP-native operations, org-level observability. See [Recipes → External scheduling with SAP BTP Job Scheduling Service](../recipes/external-scheduling-jss.md). |
+| **In-process `queued` scheduling** | Persistent task queue via `cds.queued(srv).schedule(...).every(...)`. `schedule: { every: '10m', engine: 'queued' }`. Single-winner across app instances, survives restarts, retries with exponential backoff. Requires `cds.outbox.Messages`; underlying CAP API is experimental. | Self-contained CAP apps running with >1 instance that want persistence and cross-instance safety. See [Recipes → Internal scheduling with the queued engine](../guide/recipes/internal-scheduling-queued.md). |
+| **External trigger** | Omit `schedule` entirely and call `POST /pipeline/execute` from an external scheduler (SAP BTP Job Scheduling Service, Kubernetes `CronJob`, ...). The `execute` action accepts `trigger` and `async` parameters for correct attribution and fire-and-forget 202 responses. | Centralized corporate cron, BTP-native operations, org-level observability. See [Recipes → External scheduling with SAP BTP Job Scheduling Service](../guide/recipes/external-scheduling-jss.md). |
 | **Manual trigger** | Programmatic `run()` API and the `run` OData action. | Ad-hoc runs, scripts, tests. |
 
 ## Resilience

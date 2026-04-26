@@ -135,4 +135,4 @@ Any auth setup that works with plain `cds.connect.to(...)` + `srv.run(...)` work
 - [Sources → REST adapter](rest.md) — services without a CDS model.
 - [Sources → CQN adapter](cqn.md) — in-process CAP services and `cds.requires` DB bindings.
 - [Concepts → Terminology](../concepts/terminology.md) — delta strategies in detail.
-- [Reference → Management Service](../reference/management-service.md) — programmatic `addPipeline` API.
+- [Reference → Management Service](../../reference/management-service.md) — programmatic `addPipeline` API.

@@ -25,6 +25,13 @@ if (process.env.CDS_PIPELINE_TEST_CONSUMER === 'true') {
     } catch (e) {
         if (e.code !== 'MODULE_NOT_FOUND') throw e
     }
+    if (process.env.CDS_PIPELINE_TEST_MESSAGING === 'true') {
+        try {
+            require('./test/fixtures/consumer/messaging-pipeline-bridge.js')
+        } catch (e) {
+            if (e.code !== 'MODULE_NOT_FOUND') throw e
+        }
+    }
 }
 
 // `cds add data-pipeline-monitor` — `global.cds.add` only exists for `cds add` (cds-dk); skip otherwise.

@@ -15,6 +15,9 @@
   },
   "cds": {
     "requires": {
+      "messaging": {
+        "[development]": { "kind": "file-based-messaging" }
+      },
       "db": {
         "kind": "sqlite",
         "credentials": {

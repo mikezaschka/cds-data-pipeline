@@ -17,6 +17,9 @@
       "exit_on_multi_install": false
     },
     "requires": {
+      "messaging": {
+        "[development]": { "kind": "file-based-messaging" }
+      },
       "db": {
         "kind": "sqlite",
         "credentials": {

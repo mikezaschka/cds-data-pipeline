@@ -1,6 +1,7 @@
 const cds = require('../runtime-cds')
 const { createAdapter } = require('../adapters/factory')
 const { createTargetAdapter } = require('../adapters/targets/factory')
+const { fetchEventKeyBatch } = require('./eventKeyRead')
 
 const LOG = cds.log('cds-data-pipeline')
 const PIPELINES = 'plugin_data_pipeline_Pipelines'
@@ -91,9 +92,13 @@ class Pipeline {
      *   @param {string} [runId]   caller-supplied correlation id; minted
      *                             here if omitted so scheduler / TICK
      *                             callers work unchanged.
+     *   @param {null|{ event: object }} [eventPayload]  ADR 0009: structured
+     *                             `event` object — micro-run; skips batch
+     *                             `readStream` and (on success) skips
+     *                             `Pipelines.lastSync` / cumulative stats.
      *   @returns {Promise<{ runId, status, statistics }>}
      */
-    async _run(mode = 'delta', trigger = 'manual', runId) {
+    async _run(mode = 'delta', trigger = 'manual', runId, eventPayload = null) {
         const affected = await UPDATE(PIPELINES)
             .set({ status: 'running' })
             .where({ name: this.name, status: { '!=': 'running' } })
@@ -124,17 +129,26 @@ class Pipeline {
             tracker = await this._getTracker()
 
             // ── PIPELINE.START ──
-            await this._dispatchLifecycle('PIPELINE.START', {
+            const startPayload = {
                 runId: effectiveRunId,
                 mode,
                 trigger,
                 config: this.config,
                 tracker,
-            })
+            }
+            if (eventPayload && eventPayload.event) {
+                startPayload.event = eventPayload.event
+            }
+            await this._dispatchLifecycle('PIPELINE.START', startPayload)
 
-            const stats = mode === 'full'
-                ? await this._fullSync()
-                : await this._deltaSync()
+            let stats
+            if (eventPayload && eventPayload.event) {
+                stats = await this._executeEventPayload(eventPayload.event)
+            } else {
+                stats = mode === 'full'
+                    ? await this._fullSync()
+                    : await this._deltaSync()
+            }
 
             const endTime = new Date().toISOString()
 
@@ -146,13 +160,14 @@ class Pipeline {
                 statistics_deleted: stats.deleted,
             }).where({ ID: effectiveRunId })
 
-            await UPDATE(PIPELINES).set({
-                status: 'idle',
-                lastSync: endTime,
-                statistics_created: { '+=': stats.created },
-                statistics_updated: { '+=': stats.updated },
-                statistics_deleted: { '+=': stats.deleted },
-            }).where({ name: this.name })
+            const pipelineSuccessPatch = { status: 'idle' }
+            if (!(eventPayload && eventPayload.event)) {
+                pipelineSuccessPatch.lastSync = endTime
+                pipelineSuccessPatch.statistics_created = { '+=': stats.created }
+                pipelineSuccessPatch.statistics_updated = { '+=': stats.updated }
+                pipelineSuccessPatch.statistics_deleted = { '+=': stats.deleted }
+            }
+            await UPDATE(PIPELINES).set(pipelineSuccessPatch).where({ name: this.name })
 
             // ── PIPELINE.DONE (success) ──
             await this._dispatchLifecycle('PIPELINE.DONE', {
@@ -288,8 +303,6 @@ class Pipeline {
     }
 
     async _deltaSync() {
-        const stats = { created: 0, updated: 0, deleted: 0 }
-
         // ── READ phase ──
         const readReq = this._makeReq('PIPELINE.READ', {
             config: this.config,
@@ -301,8 +314,102 @@ class Pipeline {
         const sourceStream = readReq.data.sourceStream
         if (!sourceStream) {
             LOG.warn(`No source stream produced for '${this.name}'`)
-            return stats
+            return { created: 0, updated: 0, deleted: 0 }
         }
+
+        return this._processBatchesFromStream(sourceStream)
+    }
+
+    /**
+     * ADR 0009 — event micro-run: delete by source-shaped keys (remote names),
+     * mapped to local key columns, optional `sourced` origin.
+     */
+    async _eventDeleteByKeys(keys) {
+        if (!this.targetAdapter || typeof this.targetAdapter.deleteSlice !== 'function') {
+            throw new Error(
+                `Pipeline '${this.name}': event action delete is not supported for this target adapter`
+            )
+        }
+        const viewMapping = this.config.viewMapping || { remoteToLocal: {} }
+        const { remoteToLocal } = viewMapping
+        const localPredicate = {}
+        for (const [k, v] of Object.entries(keys)) {
+            const lk = (remoteToLocal && remoteToLocal[k]) || k
+            localPredicate[lk] = v
+        }
+        if (this.hasSourceAspect && this.origin) {
+            localPredicate.source = this.origin
+        }
+        await this.targetAdapter.deleteSlice(this.config.target, localPredicate)
+        return { created: 0, updated: 0, deleted: 1 }
+    }
+
+    /**
+     * ADR 0009 — `event` object from `DataPipelineService.execute` / `executeEvent`.
+     */
+    async _executeEventPayload(event) {
+        if (!event || typeof event.read !== 'string') {
+            throw new Error(`Pipeline '${this.name}': execute event requires event.read ('key' | 'payload')`)
+        }
+        const action = event.action || 'upsert'
+        if (action === 'delete') {
+            if (event.read !== 'key' || !event.keys) {
+                throw new Error(
+                    `Pipeline '${this.name}': event action delete requires read: 'key' and event.keys (ADR 0009)`
+                )
+            }
+            return this._eventDeleteByKeys(event.keys)
+        }
+        if (action !== 'upsert') {
+            throw new Error(`Pipeline '${this.name}': unknown event.action '${action}'`)
+        }
+        if (this._isSnapshotWrite()) {
+            throw new Error(
+                `Pipeline '${this.name}': event execute is not supported for query-shape (materialize) pipelines in v1 (ADR 0009)`
+            )
+        }
+
+        let sourceStream
+        if (event.read === 'payload') {
+            const raw = event.payload
+            if (raw === undefined || raw === null) {
+                return { created: 0, updated: 0, deleted: 0 }
+            }
+            const rows = Array.isArray(raw) ? raw : [raw]
+            sourceStream = (async function* () {
+                if (rows.length) yield rows
+            })()
+        } else if (event.read === 'key') {
+            if (!event.keys || typeof event.keys !== 'object' || Object.keys(event.keys).length === 0) {
+                throw new Error(
+                    `Pipeline '${this.name}': event read:key requires a non-empty event.keys object (ADR 0009)`
+                )
+            }
+            if (this.config.source && this.config.source.adapter) {
+                throw new Error(
+                    `Pipeline '${this.name}': event read:key with source.adapter custom class is not supported in v1 (ADR 0009)`
+                )
+            }
+            const service = await cds.connect.to(this.config.source.service)
+            const batch = await fetchEventKeyBatch(service, this.config, event.keys)
+            sourceStream = (async function* () {
+                if (batch.length) yield batch
+            })()
+        } else {
+            throw new Error(
+                `Pipeline '${this.name}': event.read must be 'key' or 'payload' (got '${event.read}')`
+            )
+        }
+
+        return this._processBatchesFromStream(sourceStream)
+    }
+
+    /**
+     * Shared MAP/WRITE loop for any async-iterable of source batches
+     * (batch `_deltaSync` and ADR 0009 event upserts).
+     */
+    async _processBatchesFromStream(sourceStream) {
+        const stats = { created: 0, updated: 0, deleted: 0 }
 
         // ── Snapshot pre-write: clear the snapshot slice atomically with
         //    the subsequent INSERT batches via `cds.tx`. A crash after the
@@ -353,7 +460,9 @@ class Pipeline {
             await runBody()
         }
 
-        LOG._info && LOG.info(`Pipeline '${this.name}' processed ${stats.created} records`)
+        LOG._info && LOG.info(
+            `Pipeline '${this.name}' processed ${stats.created} created, ${stats.updated} updated, ${stats.deleted} deleted (batch totals)`
+        )
         return stats
     }
 

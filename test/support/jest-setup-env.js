@@ -4,6 +4,8 @@
  * would load the plugin's package.json instead of the test consumer app.
  */
 process.env.CDS_PIPELINE_TEST_CONSUMER = 'true'
+process.env.CDS_PIPELINE_TEST_MESSAGING = 'true'
+process.env.CDS_ENV = 'development'
 
 const path = require('path')
 const cds = require('@sap/cds')

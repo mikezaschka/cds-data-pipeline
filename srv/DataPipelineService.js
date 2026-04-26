@@ -179,6 +179,9 @@ class DataPipelineService extends cds.Service {
      *   @param {'manual'|'scheduled'|'external'|'event'} [opts.trigger='manual']
      *   @param {boolean} [opts.async=false]   true = fire-and-forget, false = block
      *   @param {'spawn'|'queued'} [opts.engine='spawn']  only honored when async=true
+     *   @param {object} [opts.event]  ADR 0009: structured event micro-run
+     *     (`read`, `action`, `keys` / `payload`); requires `trigger: 'event'`
+     *     semantics (trigger is set automatically when `event` is set).
      *   @returns {Promise<{ runId: string, name: string, done?: Promise }>}
      *
      * Behavior:
@@ -192,16 +195,37 @@ class DataPipelineService extends cds.Service {
      *     is omitted (the run may execute on another instance). Use
      *     `after('PIPELINE.DONE', name, ...)` for notifications.
      */
-    async execute(name, { mode = 'delta', trigger = 'manual', async: isAsync = false, engine = 'spawn' } = {}) {
+    async execute(name, opts = {}) {
+        const {
+            mode = 'delta',
+            trigger: triggerOpt = 'manual',
+            async: isAsync = false,
+            engine = 'spawn',
+            event: eventBlock,
+        } = opts
+
         const pipeline = this.pipelines.get(name)
         if (!pipeline) {
             throw new Error(`Unknown pipeline: ${name}`)
         }
 
+        if (eventBlock != null) {
+            this._validateEventExecute(pipeline.config, eventBlock, name)
+        }
+
+        if (eventBlock != null && isAsync && engine === 'queued') {
+            throw new Error(
+                `execute: event micro-runs (opts.event) do not support async with engine='queued' in v1 (ADR 0009). ` +
+                `Use async: false, or async: true with engine: 'spawn'.`
+            )
+        }
+
+        const trigger = eventBlock != null ? 'event' : triggerOpt
         const runId = cds.utils.uuid()
+        const eventPayload = eventBlock != null ? { event: eventBlock } : null
 
         if (!isAsync) {
-            const result = await pipeline._run(mode, trigger, runId)
+            const result = await pipeline._run(mode, trigger, runId, eventPayload)
             return { runId, name, done: Promise.resolve(result) }
         }
 
@@ -229,13 +253,73 @@ class DataPipelineService extends cds.Service {
         const done = new Promise((res, rej) => { resolve = res; reject = rej })
         cds.spawn(async () => {
             try {
-                resolve(await pipeline._run(mode, trigger, runId))
+                resolve(await pipeline._run(mode, trigger, runId, eventPayload))
             } catch (err) {
                 LOG._error && LOG.error(`Async pipeline '${name}' failed:`, err)
                 reject(err)
             }
         })
         return { runId, name, done }
+    }
+
+    /**
+     * ADR 0009 — thin alias: defaults `trigger: 'event'`, `event.action: 'upsert'`
+     * when omitted, forwards `async` / `engine` to {@link #execute}.
+     */
+    async executeEvent(name, opts = {}) {
+        if (!opts || typeof opts !== 'object') {
+            throw new Error('executeEvent requires an options object')
+        }
+        const { event, ...rest } = opts
+        if (!event || typeof event.read !== 'string') {
+            throw new Error("executeEvent: options.event with string property 'read' is required (ADR 0009)")
+        }
+        const mergedEvent = { action: 'upsert', ...event }
+        return this.execute(name, { ...rest, trigger: 'event', event: mergedEvent })
+    }
+
+    /**
+     * Validates ADR 0009 `event` block before `execute` runs.
+     * @param {object} config - normalized pipeline config
+     * @param {object} event
+     * @param {string} name - pipeline name (for error messages)
+     */
+    _validateEventExecute(config, event, name) {
+        if (config.source && config.source.query) {
+            throw new Error(
+                `execute: event path is not supported for query-shape pipelines (source.query) in v1: '${name}' (ADR 0009)`
+            )
+        }
+        if (event.read !== 'key' && event.read !== 'payload') {
+            throw new Error(
+                `execute: event.read must be 'key' or 'payload' for pipeline '${name}' (ADR 0009)`
+            )
+        }
+        const action = event.action == null ? 'upsert' : event.action
+        if (action !== 'upsert' && action !== 'delete') {
+            throw new Error(
+                `execute: event.action must be 'upsert' or 'delete' for pipeline '${name}' (got '${action}')`
+            )
+        }
+        if (action === 'delete' && event.read === 'payload') {
+            throw new Error(
+                `execute: event action delete with read:payload is not supported in v1 for pipeline '${name}' (ADR 0009)`
+            )
+        }
+        if (event.read === 'key') {
+            if (!event.keys || typeof event.keys !== 'object' || Object.keys(event.keys).length === 0) {
+                throw new Error(
+                    `execute: event read:key requires a non-empty event.keys object for pipeline '${name}' (ADR 0009)`
+                )
+            }
+        }
+        if (action === 'upsert' && event.read === 'payload') {
+            if (event.payload === undefined) {
+                throw new Error(
+                    `execute: event read:payload with action upsert requires event.payload for pipeline '${name}' (ADR 0009)`
+                )
+            }
+        }
     }
 
     async getStatus(name) {

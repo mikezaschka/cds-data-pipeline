@@ -6,9 +6,9 @@ This plugin is under active development. APIs, schema, and documentation are sti
 
 ## What it is
 
-**cds-data-pipeline** is a **SAP Cloud Application Programming Model (CAP) application-layer plugin** for traceable, scheduled data movement between **CAP-addressable** services. A pipeline is always **one source** and **one target**; a run walks a fixed **`READ → MAP → WRITE`** order. The implementation surfaces each phase as a **`PIPELINE.*` event** on `DataPipelineService` — the familiar **`before` / `on` / `after`** registration model, not a separate “pipeline runtime” you learn from scratch.
+**cds-data-pipeline** is a **CAP plugin** for scheduled, traceable data movement between CAP services. Each pipeline has **one source** and **one target**. A run follows a fixed **`READ → MAP → WRITE`** order. Every phase is a **`PIPELINE.*` event** on `DataPipelineService`, so you use the standard **`before` / `on` / `after`** hooks — no new runtime to learn.
 
-**Phases at a glance** ( **`PIPELINE.START` / `PIPELINE.DONE` omitted** ):
+**Phases at a glance** (`PIPELINE.START` / `PIPELINE.DONE` omitted):
 
 ```mermaid
 flowchart LR
@@ -24,19 +24,27 @@ flowchart LR
 
 ## Why it exists
 
-In SAP CAP, most integration surfaces as **services** — the model makes it natural to **read** from one service and **write** into another. Real apps still run into many scenarios, including those described in [CAP Data Federation](https://cap.cloud.sap/docs/guides/integration/data-federation), where you need to **move** data from one service into another (for a durable local copy, reporting, or a smaller on-disk surface than live federation). The capire walkthroughs show the pattern: that sample is not much code, but the cost is *copying and maintaining* the same loop in every project.
+CAP makes it easy to read from one service and write into another. But many real apps need to **move** data — for a local copy, reporting, or to avoid live federation overhead. See [CAP Data Federation](https://cap.cloud.sap/docs/guides/integration/data-federation) for typical scenarios. The capire walkthroughs show the pattern, but every project ends up copying and maintaining the same loop.
 
-**cds-data-pipeline** is a reusable **CAP application-layer** plugin that encapsulates that pattern: **pluggable** source and target adapters (OData, CQN, REST, local DB, and custom hooks), **delta** strategies, **scheduling** options (in-process, queued, or external), a management **`/pipeline` API**, **run history** and statistics, and a path to a **Pipeline Monitor** UI. Internally it builds on the same levers you already use — `cds` services, consumption views, `cds.spawn` (and related scheduling), and standard hook APIs — so the behavior stays **idiomatic to CAP** instead of a parallel framework on the side.
+**cds-data-pipeline** encapsulates that pattern in a reusable plugin:
+
+- **Pluggable adapters** — OData, CQN, REST, local DB, custom hooks
+- **Delta strategies** — only fetch what changed
+- **Scheduling** — in-process, queued, or external
+- **Management API** at `/pipeline` with run history and statistics
+- **Pipeline Monitor** UI
+
+It builds on `cds` services, consumption views, `cds.spawn`, and standard hooks — staying **idiomatic to CAP**.
 
 ## Scope
 
-`cds-data-pipeline` is **application-layer only** — it moves data **inside** one CAP app via `cds.connect.to`, destinations, and credentials. It is **not** a replacement for SAP Integration Suite, Datasphere replication flows, HANA SDI, or similar **cross-landscape** products.
+`cds-data-pipeline` is **application-layer only**. It moves data **inside** one CAP app via `cds.connect.to`, destinations, and credentials. It does **not** replace SAP Integration Suite, Datasphere replication flows, HANA SDI, or similar cross-landscape products.
 
 ### Minimal example
 
-The snippet **registers** a pipeline: **read** the remote **`A_BusinessPartner`** set from a connected OData service (`API_BUSINESS_PARTNER`), **UPSERT** the rows into a local table (`db.BusinessPartners`), and **re-run** on a **10 minute** in-process schedule. **Delta** mode **`timestamp`** uses **`modifiedAt`** as the watermark so later runs only pull rows that actually changed (plus paging under the hood).
+The snippet below reads `A_BusinessPartner` from a remote OData service, upserts rows into a local table, and re-runs every 10 minutes. Delta mode `timestamp` uses `modifiedAt` as the watermark so later runs only pull changed rows.
 
-For **hand-authored** services, you call `addPipeline(...)` yourself. **Annotation-driven** stacks can sit on the same engine and generate most of that wiring (for example [cds-data-federation](https://www.npmjs.com/package/cds-data-federation)).
+You call `addPipeline(...)` directly, or let an annotation-driven layer like [cds-data-federation](https://www.npmjs.com/package/cds-data-federation) generate the wiring for you.
 
 ```javascript
 const cds = require('@sap/cds');
@@ -53,12 +61,12 @@ await pipelines.addPipeline({
 });
 ```
 
-Each run is **tracked** and observable on **`/pipeline`** (or a mounted monitor). Step-by-step setup with a public API and UI is in [Get started](get-started.md).
+Runs are tracked and visible at `/pipeline` or in the mounted monitor. See [Get started](get-started.md) for a step-by-step walkthrough.
 
 ## SAP data extraction
 
 ::: info License carve-out
-`@sap/cds` ships under the [SAP Developer License Agreement (3.2 CAP)](https://cap.cloud.sap/resources/license/developer-license-3_2_CAP.txt). Section 1 limits mass extraction from an SAP product to a non-SAP product except where required for **interoperability** with an SAP product. When you point a pipeline at an SAP source, stay within that carve-out.
+`@sap/cds` ships under the [SAP Developer License Agreement (3.2 CAP)](https://cap.cloud.sap/resources/license/developer-license-3_2_CAP.txt). Section 1 limits mass extraction from an SAP product to a non-SAP product unless required for **interoperability** with an SAP product. When pointing a pipeline at an SAP source, stay within that carve-out.
 :::
 
 ## Next

@@ -1,12 +1,12 @@
 # Get started
 
-This walkthrough sets up **one replicate pipeline** using the public **[Northwind OData V4](https://services.odata.org/V4/Northwind/Northwind.svc/)** sample API: remote **Products** → local database table. The service is anonymous and read-only and as such fine for learning; swap the URL and model for your own API in production and continue to grow from here.
+Set up a single replicate pipeline using the public **[Northwind OData V4](https://services.odata.org/V4/Northwind/Northwind.svc/)** API: remote **Products** → local table. Swap the URL and model for your own API when ready.
 
 ## Prerequisites
 
-- **Node.js** >= 22 (see the [package `engines`](https://github.com/mikezaschka/cds-data-pipeline/blob/main/package.json) field on the plugin repo).
-- **`@sap/cds`** >= 9.2 (peer dependency of `cds-data-pipeline`).
-- Network access to `https://services.odata.org` (or download `$metadata` once and import offline).
+- **Node.js** >= 22
+- **`@sap/cds`** >= 9.2
+- Network access to `https://services.odata.org`
 
 ## 1. Install the plugin
 
@@ -14,9 +14,9 @@ This walkthrough sets up **one replicate pipeline** using the public **[Northwin
 npm add cds-data-pipeline
 ```
 
-The plugin **registers `DataPipelineService` for you**. Its own `package.json` declares `cds.requires.DataPipelineService.impl`, and CAP merges that into your app’s effective config when the package is installed—so you normally **do not** copy that block into your project.
+The plugin auto-registers `DataPipelineService` — no extra config needed.
 
-Include the **tracker** schema so `Pipelines` / `PipelineRuns` tables exist. In your DB model (for example `db/schema.cds`):
+Include the **tracker** schema so the `Pipelines` / `PipelineRuns` tables exist (e.g. in `db/schema.cds`):
 
 ```cds
 using from 'cds-data-pipeline/db';
@@ -26,21 +26,19 @@ namespace my.app;
 // … your entities and consumption views …
 ```
 
-Expose the **management OData** surface by reusing the plugin’s service definition in a service file (for example `srv/pipeline-mgmt.cds`):
+Expose the **management OData** surface (e.g. in `srv/pipeline-mgmt.cds`):
 
 ```cds
 using from 'cds-data-pipeline/srv/DataPipelineManagementService';
 ```
 
-You can `extend` or annotate that service in your app for authorization. The plugin does not ship auth annotations; see [Management Service](../reference/management-service.md#securing-pipeline-in-your-app).
+The plugin ships no auth annotations — add your own as needed. See [Management Service](../reference/management-service.md#securing-pipeline-in-your-app).
 
 ## 2. Import the Northwind OData API
 
-The plugin only needs the **connected service name** (e.g. `northwind`) and **entity** names that come from the model you import — same as any CAP app that **consumes an OData API**. The steps below are the standard [capire **OData import** flow](https://cap.cloud.sap/docs/guides/integration/calesi#odata-apis) (`$metadata` → **`cds import`** → `cds.requires`); skip the expander if you already have an imported service in this project.
+The plugin needs a **connected service name** and **entity** names from your imported model — the standard [capire OData import flow](https://cap.cloud.sap/docs/guides/integration/calesi#odata-apis). Skip the expander if you already have an imported service.
 
-::: details `cds import` and Northwind (standard CAP, step-by-step)
-
-Use the same flow as capire [**Consuming external services → OData APIs**](https://cap.cloud.sap/docs/guides/integration/calesi#odata-apis): start from an **OData EDMX** (metadata) file on disk, then run **`cds import`**. That command copies the file into **`srv/external/`**, generates a **`.csn`** beside it, and **merges the required `cds.requires` entry into your app’s `package.json`**. For **`cds-data-pipeline` there is nothing to add beyond that**—the plugin only needs the connected service name (e.g. `northwind`) that `cds import` registers.
+::: details `cds import` and Northwind (step-by-step)
 
 1. **Download metadata** (example: Northwind V4 — save as `.edmx`):
 
@@ -54,21 +52,21 @@ curl -sL 'https://services.odata.org/V4/Northwind/Northwind.svc/$metadata' -o no
 cds import northwind.edmx
 ```
 
-3. **Connectivity** — ensure the generated **`cds.requires.<service>`** block can reach the real API: set **`credentials.url`** to the **service root** (no `$metadata` suffix), e.g. `https://services.odata.org/V4/Northwind/Northwind.svc`, or use a **destination** on SAP BTP. If you already use packaged APIs or `npm add` for models, follow the same guide; the pipeline only references the **`requires` key** and **`source.entity`** names from the imported model.
+3. **Connectivity** — set `credentials.url` to the service root (no `$metadata` suffix), e.g. `https://services.odata.org/V4/Northwind/Northwind.svc`, or use a BTP destination.
 
-After import, CAP prints a **`using`** hint such as:
+After import, CAP prints a `using` hint:
 
 ```cds
 using { northwind as external } from './external/northwind';
 ```
 
-(paths are relative to **`srv/`** in service code—adjust for your layout). The service name in CSN (here **`northwind`**) is what you pass as `source.service` in `addPipeline` below.
+The service name (here `northwind`) is what you pass as `source.service` in `addPipeline`.
 
 :::
 
 ## 3. Define a consumption view
 
-Model the **local target** as a projection on **`northwind.Products`** and persist it as a table. The example restricts columns, **renames** one field (`ProductName` → `ProductTitle` via `as`), and excludes discontinued rows (the static `where` is merged into pipeline READs for OData / CQN sources):
+Model the **local target** as a projection on `northwind.Products`. This example restricts columns, renames one field (`ProductName` → `ProductTitle`), and excludes discontinued rows:
 
 ```cds
 using { northwind } from '../srv/external/northwind';
@@ -82,13 +80,11 @@ entity LocalProducts as projection on northwind.Products {
 } where Discontinued = false;
 ```
 
-Place this in your app namespace (for example `my.app` in `db/schema.cds`) so the fully qualified name is `my.app.LocalProducts`. Why this pattern matters is explained in [Concepts → Consumption views](concepts/consumption-views.md).
+Place this in your app namespace (e.g. `my.app` in `db/schema.cds`) so the fully qualified name is `my.app.LocalProducts`. See [Concepts → Consumption views](concepts/consumption-views.md) for details.
 
 ## 4. Register your first pipeline
 
-In `server.js` (or the file your `package.json` `"cds"` server entry loads), connect after CAP has served services and call `addPipeline`.
-
-With a **consumption view** as the target the engine infers projected columns and **`remoteToLocal` renames** (here `ProductName` → `ProductTitle`) from the projection. Northwind **Products** has **no** `ModifiedAt`-style field, so use **`mode: 'full'`** for this API (your own APIs with a change timestamp can use **`mode: 'delta'`** and `delta.field` set to the **remote** field name—see [Built-in replicate](recipes/built-in-replicate.md)).
+In `server.js`, connect after CAP has served and call `addPipeline`. The engine infers column mappings and renames from the consumption view. Northwind Products has no change-timestamp field, so we use `mode: 'full'` here (for delta, see [Built-in replicate](recipes/built-in-replicate.md)).
 
 ```javascript
 const cds = require('@sap/cds');
@@ -117,11 +113,7 @@ cds.on('served', async () => {
 module.exports = cds.server;
 ```
 
-**`after('PIPELINE.MAP_BATCH', …)`** runs per batch **on top of** the built-in mapping: **`req.data.targetRecords`** already has **local** element names (after projection renames — here **`ProductTitle`**, not `ProductName`), so you can normalize or enrich a single field before **`WRITE_BATCH`**. A user **`on`** for `PIPELINE.MAP_BATCH` would **replace** the default mapper entirely — use **`before`** / **`after`** when you only want to layer on behavior. See [Event hooks](recipes/event-hooks.md).
-
-You can still pass an explicit `viewMapping` if you want the mapping in JavaScript or need to override inference.
-
-Expose `LocalProducts` on an application service if you want to query it over OData. Tuning and variants are in [Built-in replicate](recipes/built-in-replicate.md).
+`after('PIPELINE.MAP_BATCH')` runs per batch on top of the built-in mapping. `req.data.targetRecords` already uses local names (e.g. `ProductTitle`, not `ProductName`). Use `before` / `after` to layer behavior — `on` replaces the default mapper entirely. See [Event hooks](recipes/event-hooks.md).
 
 ## 5. Deploy and run
 
@@ -130,36 +122,26 @@ Expose `LocalProducts` on an application service if you want to query it over OD
 
 ## 6. Open the monitor
 
-**Scaffold** (requires `@sap/cds-dk` so the `cds add` CLI is available): from your project root, with `cds-data-pipeline` already a dependency, run:
+Scaffold the Pipeline Console UI from your project root:
 
 ```bash
 cds add data-pipeline-monitor
 ```
 
-That copies the pre-built **Pipeline Console** (freestyle FCL UI) into `app/pipeline-console`, adds a `pipeline-console` devDependency and [cds-plugin-ui5](https://github.com/ui5-community/ui5-ecosystem-showcase/tree/main/packages/cds-plugin-ui5) configuration (default mount: `/pipeline-console`). A future version may ship the Fiori **Pipeline Monitor** list report under the same command; today the console is the scaffolded UI.
+This copies the pre-built **Pipeline Console** into `app/pipeline-console` and adds [cds-plugin-ui5](https://github.com/ui5-community/ui5-ecosystem-showcase/tree/main/packages/cds-plugin-ui5) configuration (mounted at `/pipeline-console`).
 
-Then run `npm install` and `cds watch`, and open `/pipeline-console/index.html` (or your launchpad) on the same origin as the CAP server.
+Then run `npm install` and `cds watch`, and open `/pipeline-console/index.html`.
 
-**Without the scaffold, you can:**
-
-- Use the **management OData API** directly, for example `GET /pipeline/Pipelines` and `GET /pipeline/PipelineRuns`. See [Management Service](../reference/management-service.md).
-- Reuse the **reference UI** in this repository: build the shared UI5 apps under `examples/_ui-pipeline` and mount them with cds-plugin-ui5, as in [examples/01-replicate-odata](https://github.com/mikezaschka/cds-data-pipeline/tree/main/examples/01-replicate-odata) (`pipeline-monitor` at `/pipeline-monitor`, `pipeline-console` at `/pipeline-console`).
+**Without the scaffold**, you can use the management OData API directly (`GET /pipeline/Pipelines`, `GET /pipeline/PipelineRuns`). See [Management Service](../reference/management-service.md).
 
 ## 7. Query the service and check the data
 
-1. **Trigger a run** if you did not set `schedule`: `POST /pipeline/execute` with body `{ "name": "NorthwindProducts", "mode": "full" }` (and auth if you secured `/pipeline`). See [`execute`](../reference/management-service.md#execute).
-2. **Tracker:** `GET /pipeline/Pipelines('NorthwindProducts')` or `GET /pipeline/status(name='NorthwindProducts')`.
-3. **Business data:** query your app’s OData entity that projects `my.app.LocalProducts` (or `SELECT` from the entity in CAP) and confirm rows match non-discontinued Northwind products.
+1. **Trigger a run** (if no `schedule` set): `POST /pipeline/execute` with body `{ "name": "NorthwindProducts", "mode": "full" }`. See [`execute`](../reference/management-service.md#execute).
+2. **Check status:** `GET /pipeline/Pipelines(‘NorthwindProducts’)` or `GET /pipeline/status(name=’NorthwindProducts’)`.
+3. **Query data:** access `my.app.LocalProducts` via your app service or CDS and confirm rows match non-discontinued Northwind products.
 
-## Next steps — recipes
+## Next
 
-- [Built-in replicate](recipes/built-in-replicate.md)
-- [Built-in materialize](recipes/built-in-materialize.md)
-- [Multi-source fan-in](recipes/multi-source.md)
-- [Custom source adapter](recipes/custom-source-adapter.md)
-- [Custom target adapter](recipes/custom-target-adapter.md)
-- [Event hooks](recipes/event-hooks.md)
-- [External scheduling (JSS)](recipes/external-scheduling-jss.md)
-- [Internal scheduling (queued)](recipes/internal-scheduling-queued.md)
-
-Full overview and decision tree: [Recipes](recipes/index.md).
+- [Recipes](recipes/index.md) — replicate, materialize, fan-in, custom adapters, hooks, scheduling
+- [Concepts](concepts/) — vocabulary, inference, consumption views
+- [Feature catalog](../reference/features.md)
